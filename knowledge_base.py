@@ -227,7 +227,9 @@ INTENTS: list[dict] = [
     {
         "name": "inscripcion",
         "category": "academico",
-        "keywords": ["inscripción", "inscribirse", "matricula", "matrícula", "admisión", "cómo entrar", "requisitos", "documentos", "registro"],
+        "keywords": ["inscripcion", "inscribirse", "inscribir", "inscribo", "inscribirme",
+                     "matricula", "admision", "requisitos", "documentos", "registro",
+                     "ingresar", "matricular", "entrar", "semestre"],
         "required_words": [],
         "variants": [
             "cómo me inscribo",
@@ -242,6 +244,10 @@ INTENTS: list[dict] = [
             "pasos para ingresar",
             "qué necesito para inscribirme",
             "inscripción online",
+            "cómo inscribirme en el itla",
+            "quiero inscribirme en el itla",
+            "inscribirme en el itla este semestre",
+            "cómo me matriculo en el itla",
         ],
         "response": (
             "📝 **Proceso de Inscripción ITLA**\n\n"
@@ -416,7 +422,8 @@ INTENTS: list[dict] = [
     {
         "name": "costos_becas",
         "category": "academico",
-        "keywords": ["costo", "precio", "beca", "becas", "gratuito", "gratis", "pago", "cuánto cuesta", "financiamiento"],
+        "keywords": ["costo", "precio", "beca", "becas", "gratuito", "gratis", "pago",
+                     "financiamiento", "matricula"],
         "required_words": [],
         "variants": [
             "cuánto cuesta estudiar",
