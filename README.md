@@ -1,5 +1,3 @@
-Sí, aquí lo tienes en **un solo bloque limpio listo para copiar**:
-
 ```markdown
 # ITLA Chatbot
 
