@@ -18,7 +18,6 @@ Asistente virtual del Instituto Tecnológico de Las Américas.
 
 ## Arquitectura
 
-```
 
 itla_chatbot/
 ├── config.py          # Umbrales y parámetros
