@@ -2,13 +2,9 @@
 
 > ⚠️ **IMPORTANTE — ESTADO ACTUAL DEL PROYECTO**
 >
-> ✅ La **interfaz web (Gradio)** ya está **funcionando correctamente**.
->
-> 🚧 Actualmente se encuentra en fase de **mejoras y pulido de detalles (UI/UX y compatibilidad)**.
->
+> ✅ La **interfaz web (Gradio)** ya está funcionando correctamente.  
+> 🚧 Actualmente sigo puliendo detalles de **UI/UX y compatibilidad**.  
 > 👉 El chatbot funciona tanto en **modo web** como en **modo consola (CLI)**.
-
----
 
 Asistente virtual del Instituto Tecnológico de Las Américas.  
 100% local, gratuito, sin APIs de pago.
@@ -17,61 +13,81 @@ Asistente virtual del Instituto Tecnológico de Las Américas.
 
 ## Arquitectura
 
-
+```text
 itla_chatbot/
-├── config.py # Umbrales y parámetros
-├── knowledge_base.py # 13 intents con variantes, keywords y respuestas
-├── preprocessor.py # Normalización de texto (acentos, puntuación, minúsculas)
-├── matcher.py # Keyword scoring + RapidFuzz fuzzy matching
-├── semantic.py # sentence-transformers + FAISS (capa semántica)
-├── chatbot.py # Orquestador del pipeline
-├── app.py # Interfaz web (Gradio) ✅
-├── cli.py # Interfaz de línea de comandos ✅
-└── test_chatbot.py # Suite de pruebas
-
-
----
+├── config.py          # Umbrales y parámetros
+├── knowledge_base.py  # 13 intents con variantes, keywords y respuestas
+├── preprocessor.py    # Normalización de texto (acentos, puntuación, minúsculas)
+├── matcher.py         # Keyword scoring + RapidFuzz fuzzy matching
+├── semantic.py        # sentence-transformers + FAISS (capa semántica)
+├── chatbot.py         # Orquestador del pipeline
+├── app.py             # Interfaz web (Gradio) ✅
+├── cli.py             # Interfaz de línea de comandos ✅
+└── test_chatbot.py    # Suite de pruebas
+````
 
 ## Pipeline de matching
 
-
+```text
 Input → Preprocesamiento → Keyword scoring
-→ Fuzzy matching (RapidFuzz)
-→ Semantic search (opcional)
-→ Puntuación combinada
-→ Umbral de confianza → Respuesta / Fallback
-
-
----
+      → Fuzzy matching (RapidFuzz)
+      → Semantic search (opcional)
+      → Puntuación combinada
+      → Umbral de confianza
+      → Respuesta / Fallback
+```
 
 ## Instalación
 
 ```bash
 pip install -r requirements.txt
+```
 
 Modo ligero (sin capa semántica):
 
+```bash
 pip install gradio rapidfuzz
-Uso
-🌐 Web UI (RECOMENDADO)
+```
+
+## Uso
+
+### 🌐 Web UI (recomendado)
+
+```bash
 python app.py
 # → http://localhost:7860
-🖥️ CLI
-python cli.py
-🧪 Tests
-python test_chatbot.py
-Umbrales de confianza
-Nivel	Score	Comportamiento
-high	≥ 65	Respuesta directa
-medium	≥ 35	Respuesta extendida + nota
-low	≥ 15	Mejor intento + advertencia
-fallback	< 15	Redirección a contacto
-Agregar nuevos intents
+```
 
-Edita knowledge_base.py y agrega un nuevo dict a INTENTS.
+### 🖥️ CLI
+
+```bash
+python cli.py
+```
+
+### 🧪 Tests
+
+```bash
+python test_chatbot.py
+```
+
+## Umbrales de confianza
+
+| Nivel    | Score | Comportamiento              |
+| -------- | ----: | --------------------------- |
+| high     |  ≥ 65 | Respuesta directa           |
+| medium   |  ≥ 35 | Respuesta extendida + nota  |
+| low      |  ≥ 15 | Mejor intento + advertencia |
+| fallback |  < 15 | Redirección a contacto      |
+
+## Agregar nuevos intents
+
+Edita `knowledge_base.py` y agrega un nuevo diccionario a `INTENTS`.
 
 El engine lo tomará automáticamente.
-Borra .cache/embeddings.pkl para regenerar embeddings si usas la capa semántica.
+Si usas la capa semántica, borra `.cache/embeddings.pkl` para regenerar los embeddings.
 
-Fuente de información
-https://www.itla.edu.do
+## Fuente de información
+
+* [ITLA](https://www.itla.edu.do)
+
+```
