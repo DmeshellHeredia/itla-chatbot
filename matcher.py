@@ -2,9 +2,17 @@
 Intent matching engine.
 
 Pipeline (fast → slow):
-  1. Keyword scoring  – weighted token overlap
+  1. Keyword scoring  – weighted token overlap (single + multi-word, token-based only)
   2. Fuzzy matching   – RapidFuzz against all variants
-  3. Combined score   – max of both layers
+  3. Combined score   – gated by keyword evidence, not max()
+  4. Minimum threshold – absolute floor before returning any match
+
+Scoring rules
+─────────────
+• hits == 0  → fuzzy is unreliable; cap contribution at 15% (out-of-domain guard)
+• hits == 1 and long query (6+ tokens) → weak evidence; reduced fuzzy weight
+• hits >= 2  → full weighted blend (kw 60% + fz 40%)
+• Minimum combined score of 22 before a result is returned
 """
 
 from __future__ import annotations
@@ -16,48 +24,72 @@ from knowledge_base import INTENTS
 from preprocessor import normalize, normalize_list, tokenize
 
 
-# ── Pre-computed normalized variants per intent ────────────────────────────────
+# ── Pre-computed normalised data ───────────────────────────────────────────────
 _NORM_VARIANTS: dict[str, list[str]] = {
     intent["name"]: normalize_list(intent["variants"]) for intent in INTENTS
 }
 
-_NORM_KEYWORDS: dict[str, list[str]] = {
-    intent["name"]: normalize_list(intent["keywords"]) for intent in INTENTS
-}
+# Keywords split into single-word and multi-word buckets at load time
+_SINGLE_KW: dict[str, list[str]] = {}
+_MULTI_KW:  dict[str, list[list[str]]] = {}
+
+for _intent in INTENTS:
+    _name = _intent["name"]
+    _single, _multi = [], []
+    for kw in normalize_list(_intent["keywords"]):
+        parts = kw.split()
+        if len(parts) == 1:
+            _single.append(kw)
+        else:
+            _multi.append(parts)
+    _SINGLE_KW[_name] = _single
+    _MULTI_KW[_name]  = _multi
 
 
 # ── 1. Keyword scoring ─────────────────────────────────────────────────────────
 
-def _keyword_score(tokens: list[str], intent: dict) -> float:
+def _keyword_score(tokens: list[str], intent: dict) -> tuple[float, int]:
     """
-    Score 0-100 based on token overlap with intent keywords.
-    Required-words logic: if any required word is absent → 0.
+    Returns (score_0_to_100, raw_hit_count).
+
+    Multi-word keywords are matched by checking ALL component tokens are present
+    in the token list — NOT by substring on the joined string (avoids false
+    positives like 'cuanto cuesta' inside 'cuanto cuesta un iphone').
     """
-    norm_keywords = _NORM_KEYWORDS[intent["name"]]
+    name = intent["name"]
     norm_required = normalize_list(intent.get("required_words", []))
 
-    # Hard gate: all required words must be present
+    # Hard gate: every required word must be present
     for req in norm_required:
         if req not in tokens:
-            return 0.0
+            return 0.0, 0
 
-    if not norm_keywords:
-        return 0.0
+    single_kws = _SINGLE_KW[name]
+    multi_kws  = _MULTI_KW[name]
 
-    hits = sum(1 for kw in norm_keywords if kw in tokens)
+    if not single_kws and not multi_kws:
+        return 0.0, 0
 
-    # Boost exact multi-word keyword matches
-    norm_input = " ".join(tokens)
-    exact_boost = sum(10 for kw in norm_keywords if " " in kw and kw in norm_input)
+    hits: float = 0.0
 
-    raw = (hits / len(norm_keywords)) * 100 + exact_boost
-    return min(raw, 100.0)
+    for kw in single_kws:
+        if kw in tokens:
+            hits += 1.0
+
+    # Multi-word: ALL component tokens must appear (token-set check, no substring)
+    for parts in multi_kws:
+        if all(p in tokens for p in parts):
+            hits += 1.5   # slight weight for more specific phrase match
+
+    total_kws = len(single_kws) + len(multi_kws)
+    raw_score = (hits / total_kws) * 100
+    return min(raw_score, 100.0), int(hits)
 
 
 # ── 2. Fuzzy matching ──────────────────────────────────────────────────────────
 
 def _fuzzy_score(norm_input: str, intent: dict) -> float:
-    """Best RapidFuzz partial_ratio score against all normalized variants."""
+    """Best RapidFuzz token_set_ratio score against all normalised variants."""
     candidates = _NORM_VARIANTS[intent["name"]]
     if not candidates:
         return 0.0
@@ -70,50 +102,61 @@ def _fuzzy_score(norm_input: str, intent: dict) -> float:
     return result[1] if result else 0.0
 
 
+# ── 3. Gated combination ───────────────────────────────────────────────────────
+
+def _combine(kw: float, fz: float, sem: float, hits: int, n_tokens: int) -> float:
+    """
+    Merge keyword, fuzzy, and semantic signals with evidence-gating.
+
+    hits == 0     → fuzzy carries almost no weight (out-of-domain guard)
+    hits == 1 and long query → reduced fuzzy weight
+    hits >= 2     → full blend
+    """
+    if hits == 0:
+        kw_fz = fz * 0.15           # near-zero; fuzzy alone cannot confirm a match
+    elif hits == 1 and n_tokens >= 6:
+        kw_fz = kw * 0.65 + fz * 0.20   # keyword dominates; fuzzy is cautious
+    else:
+        kw_fz = kw * 0.60 + fz * 0.40
+
+    if sem > 0:
+        return kw_fz * 0.55 + sem * 0.45
+    return kw_fz
+
+
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-MatchResult = dict  # {"intent": dict, "score": float, "method": str}
+#: Minimum combined score to return *any* match (below → fallback / None)
+_MIN_SCORE = 22
+
+MatchResult = dict
 
 
 def match(user_input: str, semantic_scores: dict[str, float] | None = None) -> MatchResult | None:
     """
-    Find the best-matching intent for `user_input`.
+    Find the best-matching intent for *user_input*.
 
-    Parameters
-    ----------
-    user_input      : raw user message
-    semantic_scores : optional dict {intent_name: float 0-100} from semantic layer
-
-    Returns
-    -------
-    Best match dict or None if nothing clears CONFIDENCE_LOW.
+    Returns a result dict or None when no intent clears the minimum threshold.
     """
     norm_input = normalize(user_input)
-    tokens = tokenize(user_input)
+    tokens     = tokenize(user_input)
+    n_tokens   = len(tokens)
 
     scores: dict[str, float] = {}
 
     for intent in INTENTS:
         name = intent["name"]
 
-        kw  = _keyword_score(tokens, intent)
-        fz  = _fuzzy_score(norm_input, intent)
-        sem = (semantic_scores or {}).get(name, 0.0)
+        kw, hits = _keyword_score(tokens, intent)
+        fz       = _fuzzy_score(norm_input, intent)
+        sem      = (semantic_scores or {}).get(name, 0.0)
 
-        # Combine: take the dominant keyword/fuzzy signal, blend with semantic
-        keyword_fuzzy = max(kw, fz)
+        scores[name] = round(_combine(kw, fz, sem, hits, n_tokens), 2)
 
-        if sem > 0:
-            combined = keyword_fuzzy * 0.55 + sem * 0.45
-        else:
-            combined = keyword_fuzzy
-
-        scores[name] = round(combined, 2)
-
-    best_name = max(scores, key=scores.get)
+    best_name  = max(scores, key=scores.get)
     best_score = scores[best_name]
 
-    if best_score < 10:
+    if best_score < _MIN_SCORE:
         return None
 
     best_intent = next(i for i in INTENTS if i["name"] == best_name)

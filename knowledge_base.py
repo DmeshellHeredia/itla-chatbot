@@ -180,7 +180,7 @@ INTENTS: list[dict] = [
     {
         "name": "oferta_academica",
         "category": "academico",
-        "keywords": ["carrera", "carreras", "programa", "programas", "oferta", "académica", "estudiar", "qué estudian", "tecnología", "grado"],
+        "keywords": ["carrera", "carreras", "programa", "programas", "oferta", "academica", "estudiar", "tecnologia", "grado", "software", "desarrollo", "programacion", "sistemas", "ingenieria", "aprender", "interesado"],
         "required_words": [],
         "variants": [
             "qué carreras ofrecen",
@@ -195,6 +195,11 @@ INTENTS: list[dict] = [
             "programas de grado",
             "qué puedo estudiar",
             "tienen ingeniería",
+            "quiero estudiar desarrollo de software",
+            "estoy interesado en estudiar en el itla",
+            "interesado en desarrollo de software",
+            "estudiar programación en el itla",
+            "carrera de sistemas",
         ],
         "response": (
             "📚 **Oferta Académica ITLA**\n\n"
@@ -261,7 +266,7 @@ INTENTS: list[dict] = [
     {
         "name": "educacion_continua",
         "category": "academico",
-        "keywords": ["educación continua", "cursos", "certificación", "taller", "diplomado", "capacitación", "corta duración", "profesional"],
+        "keywords": ["educacion", "continua", "cursos", "certificacion", "taller", "diplomado", "capacitacion", "corta", "profesional", "cisco", "comptia", "oracle", "microsoft", "bootcamp", "certificar"],
         "required_words": [],
         "variants": [
             "qué cursos cortos tienen",
@@ -276,6 +281,11 @@ INTENTS: list[dict] = [
             "formación continua",
             "cursos para profesionales",
             "tienen bootcamps",
+            "tienen programa de certificación en cisco",
+            "certificación en comptia",
+            "cursos de cisco",
+            "cursos de oracle",
+            "programa de certificación internacional",
         ],
         "response": (
             "🎓 **Educación Continua ITLA**\n\n"
@@ -368,7 +378,7 @@ INTENTS: list[dict] = [
     {
         "name": "plataforma",
         "category": "servicios",
-        "keywords": ["plataforma", "moodle", "virtual", "aula", "online", "clases virtuales", "campus virtual", "sistema estudiantil"],
+        "keywords": ["plataforma", "moodle", "virtual", "aula", "online", "campus", "usuario", "login", "recuperar", "contrasena", "entrar", "acceso", "cursos"],
         "required_words": [],
         "variants": [
             "cómo accedo a la plataforma",
@@ -383,6 +393,11 @@ INTENTS: list[dict] = [
             "campus online",
             "dónde veo mis cursos",
             "sistema de notas",
+            "cómo recupero mi usuario",
+            "recuperar usuario campus virtual",
+            "olvidé mi usuario del sistema",
+            "entrar al campus virtual",
+            "cómo entro al campus virtual con mi usuario",
         ],
         "response": (
             "💻 **Plataforma Virtual ITLA**\n\n"
