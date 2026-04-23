@@ -1,0 +1,11 @@
+# ── Core dependencies ─────────────────────────────────────────────────────────
+gradio>=4.20.0
+rapidfuzz>=3.5.0
+
+# ── Semantic search (optional but recommended) ────────────────────────────────
+# Comment these out if you want a lightweight keyword-only mode
+sentence-transformers>=2.7.0
+faiss-cpu>=1.8.0
+
+# ── Already included in Python stdlib ────────────────────────────────────────
+# re, unicodedata, os, pickle, random, pathlib
