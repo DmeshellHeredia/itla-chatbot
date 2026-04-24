@@ -1,22 +1,11 @@
 """
 ITLA Knowledge Base
+
 All chatbot content lives here. Each intent follows a strict schema so the
 matching engine can treat every entry uniformly.
-
-Schema
-------
-name          : str   – unique snake_case identifier
-category      : str   – grouping label
-keywords      : list  – high-signal words used for keyword scoring
-required_words: list  – ALL of these must be present for a keyword match
-variants      : list  – natural-language phrasings (drives fuzzy + semantic)
-response      : str   – primary, concise answer
-extended      : str   – longer answer (used when confidence is medium)
-source        : str   – reference URL or note
 """
 
 INTENTS: list[dict] = [
-    # ── 1. SALUDO ──────────────────────────────────────────────────────────────
     {
         "name": "saludo",
         "category": "general",
@@ -50,11 +39,13 @@ INTENTS: list[dict] = [
         "source": "N/A",
     },
 
-    # ── 2. QUÉ ES EL ITLA ──────────────────────────────────────────────────────
     {
         "name": "que_es_itla",
         "category": "institucional",
-        "keywords": ["itla", "instituto", "tecnológico", "américas", "qué es", "quiénes son", "institución", "misión", "visión"],
+        "keywords": [
+            "itla", "instituto", "tecnológico", "américas", "qué es",
+            "quiénes son", "institución", "misión", "visión"
+        ],
         "required_words": [],
         "variants": [
             "qué es el itla",
@@ -87,7 +78,6 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do",
     },
 
-    # ── 3. UBICACIÓN ───────────────────────────────────────────────────────────
     {
         "name": "ubicacion",
         "category": "contacto",
@@ -107,7 +97,7 @@ INTENTS: list[dict] = [
             "dónde los encuentro",
         ],
         "response": (
-            "📍 **Sede Central ITLA**\n"
+            "📍 **Sede Central ITLA**\n\n"
             "Autopista Duarte Km. 16½, Los Alcarrizos,\n"
             "Santo Domingo Oeste, República Dominicana.\n\n"
             "El ITLA también cuenta con sedes regionales en distintas provincias del país. "
@@ -117,7 +107,6 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/contacto",
     },
 
-    # ── 4. TELÉFONO / CONTACTO ─────────────────────────────────────────────────
     {
         "name": "telefono",
         "category": "contacto",
@@ -147,7 +136,6 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/contacto",
     },
 
-    # ── 5. CORREO ──────────────────────────────────────────────────────────────
     {
         "name": "correo",
         "category": "contacto",
@@ -176,11 +164,14 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/contacto",
     },
 
-    # ── 6. OFERTA ACADÉMICA ────────────────────────────────────────────────────
     {
         "name": "oferta_academica",
         "category": "academico",
-        "keywords": ["carrera", "carreras", "programa", "programas", "oferta", "academica", "estudiar", "tecnologia", "grado", "software", "desarrollo", "programacion", "sistemas", "ingenieria", "aprender", "interesado"],
+        "keywords": [
+            "carrera", "carreras", "programa", "programas", "oferta", "academica",
+            "estudiar", "tecnologia", "grado", "software", "desarrollo",
+            "programacion", "sistemas", "ingenieria", "aprender", "interesado"
+        ],
         "required_words": [],
         "variants": [
             "qué carreras ofrecen",
@@ -223,13 +214,14 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/oferta-academica",
     },
 
-    # ── 7. INSCRIPCIÓN ─────────────────────────────────────────────────────────
     {
         "name": "inscripcion",
         "category": "academico",
-        "keywords": ["inscripcion", "inscribirse", "inscribir", "inscribo", "inscribirme",
-                     "matricula", "admision", "requisitos", "documentos", "registro",
-                     "ingresar", "matricular", "entrar", "semestre"],
+        "keywords": [
+            "inscripcion", "inscribirse", "inscribir", "inscribo", "inscribirme",
+            "matricula", "admision", "requisitos", "documentos", "registro",
+            "ingresar", "matricular", "entrar", "semestre"
+        ],
         "required_words": [],
         "variants": [
             "cómo me inscribo",
@@ -268,11 +260,14 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/admisiones",
     },
 
-    # ── 8. EDUCACIÓN CONTINUA ──────────────────────────────────────────────────
     {
         "name": "educacion_continua",
         "category": "academico",
-        "keywords": ["educacion", "continua", "cursos", "certificacion", "taller", "diplomado", "capacitacion", "corta", "profesional", "cisco", "comptia", "oracle", "microsoft", "bootcamp", "certificar"],
+        "keywords": [
+            "educacion", "continua", "cursos", "certificacion", "taller",
+            "diplomado", "capacitacion", "corta", "profesional", "cisco",
+            "comptia", "oracle", "microsoft", "bootcamp", "certificar"
+        ],
         "required_words": [],
         "variants": [
             "qué cursos cortos tienen",
@@ -308,11 +303,13 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/educacion-continua",
     },
 
-    # ── 9. SOPORTE TÉCNICO ─────────────────────────────────────────────────────
     {
         "name": "soporte",
         "category": "servicios",
-        "keywords": ["soporte", "técnico", "ayuda", "problema", "falla", "sistema", "cuenta", "contraseña", "acceso"],
+        "keywords": [
+            "soporte", "técnico", "ayuda", "problema", "falla", "sistema",
+            "cuenta", "contraseña", "acceso", "usuario", "recuperar"
+        ],
         "required_words": [],
         "variants": [
             "necesito soporte técnico",
@@ -343,7 +340,6 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/soporte",
     },
 
-    # ── 10. SEDES ──────────────────────────────────────────────────────────────
     {
         "name": "sedes",
         "category": "contacto",
@@ -380,11 +376,14 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/sedes",
     },
 
-    # ── 11. PLATAFORMA / MOODLE ────────────────────────────────────────────────
     {
         "name": "plataforma",
         "category": "servicios",
-        "keywords": ["plataforma", "moodle", "virtual", "aula", "online", "campus", "usuario", "login", "recuperar", "contrasena", "entrar", "acceso", "cursos"],
+        "keywords": [
+            "plataforma", "moodle", "virtual", "aula", "online", "campus",
+            "usuario", "login", "recuperar", "contrasena", "contraseña",
+            "entrar", "acceso", "cursos", "clases", "nota", "notas"
+        ],
         "required_words": [],
         "variants": [
             "cómo accedo a la plataforma",
@@ -404,26 +403,60 @@ INTENTS: list[dict] = [
             "olvidé mi usuario del sistema",
             "entrar al campus virtual",
             "cómo entro al campus virtual con mi usuario",
+            "qué es moodle",
+            "que es moodle",
+            "para qué sirve moodle",
+            "para que sirve moodle",
+            "qué es la plataforma moodle",
+            "que es la plataforma moodle",
+            "qué es el campus virtual",
+            "que es el campus virtual",
+            "qué es la plataforma virtual",
+            "que es la plataforma virtual",
+            "qué es el aula virtual",
+            "que es el aula virtual",
+            "qué es la plataforma del itla",
+            "que es la plataforma del itla",
+            "moodle del itla",
+            "campus virtual del itla",
+            "plataforma virtual del itla",
+            "para qué sirve el campus virtual",
+            "para que sirve el campus virtual",
+            "para qué sirve la plataforma virtual",
+            "para que sirve la plataforma virtual",
         ],
         "response": (
-            "💻 **Plataforma Virtual ITLA**\n\n"
-            "Accede al aula virtual (Moodle) en:\n"
+            "💻 **Plataforma Virtual ITLA / Moodle**\n\n"
+            "**Moodle** es la plataforma virtual que utiliza el ITLA para apoyar las clases y gestionar "
+            "contenidos académicos.\n\n"
+            "Desde Moodle o el campus virtual puedes:\n"
+            "- Ver cursos y materiales de clase\n"
+            "- Acceder a tareas y actividades\n"
+            "- Revisar recursos publicados por profesores\n"
+            "- Participar en cursos en línea o semipresenciales\n\n"
+            "Accede en:\n"
             "🔗 [moodle.itla.edu.do](https://moodle.itla.edu.do)\n\n"
             "**Para iniciar sesión:**\n"
             "- Usuario: tu matrícula estudiantil\n"
-            "- Contraseña: asignada por admisiones\n\n"
+            "- Contraseña: asignada por admisiones o soporte\n\n"
             "¿Problemas para entrar? Escribe *soporte* para obtener ayuda."
         ),
-        "extended": None,
+        "extended": (
+            "La **plataforma virtual del ITLA**, comúnmente asociada a Moodle, funciona como un aula digital. "
+            "Allí los estudiantes pueden consultar contenidos de sus asignaturas, tareas, recursos, actividades "
+            "y comunicaciones académicas. Si tienes problemas de acceso, usuario o contraseña, lo recomendable "
+            "es contactar a soporte técnico del ITLA."
+        ),
         "source": "https://moodle.itla.edu.do",
     },
 
-    # ── 12. COSTOS / BECA ──────────────────────────────────────────────────────
     {
         "name": "costos_becas",
         "category": "academico",
-        "keywords": ["costo", "precio", "beca", "becas", "gratuito", "gratis", "pago",
-                     "financiamiento", "matricula"],
+        "keywords": [
+            "costo", "precio", "beca", "becas", "gratuito", "gratis",
+            "pago", "financiamiento", "matricula"
+        ],
         "required_words": [],
         "variants": [
             "cuánto cuesta estudiar",
@@ -431,13 +464,15 @@ INTENTS: list[dict] = [
             "hay becas disponibles",
             "el itla es gratis",
             "cómo aplico a una beca",
-            "precio de las carreras",
+            "precio para estudiar en el itla",
             "costo de matrícula",
             "financiamiento estudiantil",
             "beca del estado",
             "itla es gratuito",
             "quiero una beca",
-            "cuánto cuesta la carrera",
+            "cuánto cuesta estudiar una carrera en el itla",
+            "costo de estudiar en el itla",
+            "precio de estudiar en el itla",
         ],
         "response": (
             "💰 **Costos y Becas ITLA**\n\n"
@@ -454,7 +489,6 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/admisiones",
     },
 
-    # ── 13. DESPEDIDA ──────────────────────────────────────────────────────────
     {
         "name": "despedida",
         "category": "general",
@@ -483,5 +517,4 @@ INTENTS: list[dict] = [
     },
 ]
 
-# ── Quick-access index ─────────────────────────────────────────────────────────
 INTENT_MAP: dict[str, dict] = {intent["name"]: intent for intent in INTENTS}

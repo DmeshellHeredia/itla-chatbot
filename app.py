@@ -1,15 +1,11 @@
 """
-ITLA Chatbot — Web Interface
-
-Compatibility:
-  - No `type=` on gr.Chatbot
-  - No `bubble_full_width`, `show_share_button`, `show_copy_button`, `avatar_images`
-  - No `show_api` in launch()
-  - Chat history: {"role": "...", "content": "..."} dict format
-  - CSS passed to launch(), not Blocks()
-  - demo.queue() for streaming/generator support
-
-Run: python app.py
+ITLA Chatbot — Premium UI
+Compatible with your current Gradio setup:
+- message history as {"role": "...", "content": "..."}
+- no type= on gr.Chatbot
+- no bubble_full_width
+- no show_api in launch()
+- CSS injected in launch()
 """
 
 from __future__ import annotations
@@ -20,7 +16,9 @@ import gradio as gr
 
 from chatbot import ChatBot
 
-# ── Background loading ─────────────────────────────────────────────────────────
+GITHUB_PROFILE_URL = "https://github.com/DmeshellHeredia"
+
+# ── Background loading ────────────────────────────────────────────────────────
 _bot: ChatBot | None = None
 _bot_ready = threading.Event()
 
@@ -33,7 +31,7 @@ def _load():
 
 threading.Thread(target=_load, daemon=True).start()
 
-# ── Constants ──────────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 _INITIAL_MSG = (
     "¡Hola! 👋 Soy el asistente virtual del **ITLA**.\n\n"
     "Puedo ayudarte con información sobre:\n"
@@ -46,36 +44,36 @@ _INITIAL_MSG = (
 )
 
 _LOADING_MSG = (
-    "⏳ *Iniciando el motor de IA por primera vez...* "
-    "Esto puede tomar 20–30 segundos. Solo ocurre la primera vez."
+    "⏳ *Iniciando el motor semántico por primera vez...* "
+    "Esto puede tardar 20–30 segundos. Solo ocurre en el primer arranque."
 )
 
 _CONFIDENCE_BADGES = {
     "high": "",
-    "medium": "\n\n---\n*Respuesta aproximada — si no es lo que buscas, intenta reformular.*",
-    "low": "\n\n---\n*Respuesta de baja confianza — visita [itla.edu.do](https://www.itla.edu.do)*",
+    "medium": "\n\n> 💡 *Respuesta aproximada — reformula si necesitas más detalle.*",
+    "low": "\n\n> ⚠️ *Confianza baja — visita [itla.edu.do](https://www.itla.edu.do)*",
     "fallback": "",
 }
 
 
-def _assistant_msg(content: str) -> dict:
+def _am(content: str) -> dict:
     return {"role": "assistant", "content": content}
 
 
-def _user_msg(content: str) -> dict:
+def _um(content: str) -> dict:
     return {"role": "user", "content": content}
 
 
-_INIT_HISTORY: list[dict] = [_assistant_msg(_INITIAL_MSG)]
+_INIT_HISTORY: list[dict] = [_am(_INITIAL_MSG)]
 
-# ── Quick actions / FAQs ───────────────────────────────────────────────────────
+# ── Sidebar data ──────────────────────────────────────────────────────────────
 QUICK_ACTIONS = {
-    "📚 Oferta Académica":   "¿Cuáles carreras ofrecen en el ITLA?",
-    "📝 Inscripción":        "¿Cómo es el proceso de inscripción?",
+    "📚 Oferta Académica": "¿Cuáles carreras ofrecen en el ITLA?",
+    "📝 Inscripción": "¿Cómo es el proceso de inscripción?",
     "🎓 Educación Continua": "¿Tienen cursos cortos o certificaciones?",
-    "🛠️ Soporte":            "Necesito soporte técnico",
-    "📞 Contacto":           "¿Cuál es el teléfono y correo del ITLA?",
-    "🗺️ Sedes":              "¿En qué provincias tienen sedes?",
+    "🛠️ Soporte": "Necesito soporte técnico",
+    "📞 Contacto": "¿Cuál es el teléfono y correo del ITLA?",
+    "🗺️ Sedes": "¿En qué provincias tienen sedes?",
 }
 
 FAQS = [
@@ -89,22 +87,198 @@ FAQS = [
     "¿Hay becas disponibles?",
 ]
 
-# ── CSS ────────────────────────────────────────────────────────────────────────
-CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+# ── JS injected into <head> ───────────────────────────────────────────────────
+_JS_HEAD = """
+<script>
+(function () {
+    const saved = localStorage.getItem("itla-theme") || "dark";
+    document.documentElement.setAttribute("data-theme", saved);
+})();
 
-/* ── Reset & Base ── */
-*, *::before, *::after { box-sizing: border-box; }
-
-.gradio-container, body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
-    background: #f0f4ff !important;
+function syncThemeIcon() {
+    const icon = document.getElementById("theme-icon");
+    if (!icon) return;
+    const theme = document.documentElement.getAttribute("data-theme") || "dark";
+    icon.textContent = theme === "dark" ? "☀️" : "🌙";
 }
 
-/* ── Hide Gradio chrome ── */
+function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("itla-theme", next);
+    syncThemeIcon();
+}
+
+function openAbout() {
+    const modal = document.getElementById("about-overlay");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeAbout() {
+    const modal = document.getElementById("about-overlay");
+    if (modal) modal.style.display = "none";
+}
+
+document.addEventListener("DOMContentLoaded", syncThemeIcon);
+window.addEventListener("load", syncThemeIcon);
+</script>
+"""
+
+# ── HTML fragments ────────────────────────────────────────────────────────────
+_ABOUT_MODAL = f"""
+<div id="about-overlay"
+     onclick="if(event.target===this)closeAbout()"
+     style="display:none;position:fixed;inset:0;z-index:9999;
+            background:rgba(0,10,30,.82);backdrop-filter:blur(8px);
+            align-items:center;justify-content:center;padding:20px;">
+    <div class="about-card">
+        <button class="about-x" onclick="closeAbout()">✕</button>
+        <div class="about-hdr">
+            <div class="about-icon">🎓</div>
+            <div>
+                <div class="about-name">ITLA Chatbot</div>
+                <div class="about-tagline">Asistente Virtual Inteligente</div>
+            </div>
+        </div>
+        <p class="about-desc">
+            Asistente virtual del Instituto Tecnológico de Las Américas, construido como
+            proyecto académico de NLP e IA local. Funciona completamente en tu máquina,
+            sin APIs externas ni costos de ningún tipo.
+        </p>
+        <div class="about-grid">
+            <div class="about-chip">
+                <div class="chip-lbl">Motor NLP</div>
+                <div class="chip-val">RapidFuzz + Fuzzy Matching</div>
+            </div>
+            <div class="about-chip">
+                <div class="chip-lbl">Búsqueda Semántica</div>
+                <div class="chip-val">FAISS + sentence-transformers</div>
+            </div>
+            <div class="about-chip">
+                <div class="chip-lbl">Interfaz</div>
+                <div class="chip-val">Gradio + Python</div>
+            </div>
+            <div class="about-chip about-chip-green">
+                <div class="chip-lbl" style="color:#22c55e;">Privacidad</div>
+                <div class="chip-val">100% local · Sin APIs de pago</div>
+            </div>
+        </div>
+        <div class="about-actions">
+            <a href="{GITHUB_PROFILE_URL}" target="_blank" class="about-btn about-ghost">
+                ⬡&nbsp; Ver en GitHub
+            </a>
+            <a href="https://www.itla.edu.do" target="_blank" class="about-btn about-primary">
+                🌐&nbsp; itla.edu.do
+            </a>
+        </div>
+    </div>
+</div>
+"""
+
+_SIDEBAR_BRAND = """
+<div class="sb-brand">
+    <div class="sb-logo">🎓</div>
+    <div>
+        <div class="sb-title">ITLA</div>
+        <div class="sb-sub">Asistente Virtual</div>
+    </div>
+</div>
+"""
+
+_HEADER_HTML = """
+<div class="main-header">
+    <div class="hdr-left">
+        <div class="hdr-icon">🤖</div>
+        <div>
+            <h1 class="hdr-title">Asistente Virtual del ITLA</h1>
+            <p class="hdr-sub">Instituto Tecnológico de Las Américas · IA local y gratuita</p>
+        </div>
+    </div>
+    <div class="hdr-right">
+        <div class="hdr-status">
+            <span class="status-dot"></span>En línea
+        </div>
+        <button class="hdr-btn" onclick="toggleTheme()" title="Cambiar tema">
+            <span id="theme-icon">☀️</span>
+        </button>
+        <button class="hdr-btn" onclick="openAbout()" title="Acerca del proyecto">ℹ️</button>
+    </div>
+</div>
+"""
+
+# ── CSS ────────────────────────────────────────────────────────────────────────
+CSS = r"""
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --bg: #071224;
+    --surface: #0b1628;
+    --surface-2: #0f1e35;
+    --surface-3: #122540;
+    --border: #1a2e4f;
+    --border-2: #27426d;
+    --accent: #2563eb;
+    --accent-2: #3b82f6;
+    --accent-3: #4338ca;
+    --text: #dbe8fb;
+    --text-soft: #8aa0c5;
+    --text-dim: #54719d;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --shadow: 0 10px 28px rgba(0, 0, 0, .28);
+    --radius: 16px;
+    --font: 'Outfit', system-ui, sans-serif;
+}
+
+html[data-theme="light"] {
+    --bg: #eef4ff;
+    --surface: #ffffff;
+    --surface-2: #f6f9ff;
+    --surface-3: #edf3ff;
+    --border: #d7e2f7;
+    --border-2: #b9cbee;
+    --accent: #2563eb;
+    --accent-2: #3b82f6;
+    --accent-3: #4338ca;
+    --text: #122033;
+    --text-soft: #506b92;
+    --text-dim: #8397b3;
+    --shadow: 0 10px 28px rgba(37, 99, 235, .08);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 100vh;
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    font-family: var(--font) !important;
+}
+
+/* Full width without breaking layout */
+.gradio-container,
+.gradio-container .main,
+.gradio-container .contain,
+.contain,
+.main {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: var(--bg) !important;
+}
+
+/* Hide most Gradio chrome */
 footer,
 .gradio-container > footer,
-.svelte-byatnx,
 button.share-button,
 .share-button,
 .share-btn-container,
@@ -113,348 +287,849 @@ button.share-button,
 .show-api,
 .api-docs-link,
 #api-docs,
+.gradio-api-info,
+.gradio-footer,
+a[href*="gradio.app"],
+a[href*="huggingface"],
+button[aria-label*="Share"],
+button[title*="Share"],
+button[title*="API"],
+button[aria-label*="API"],
+.svelte-byatnx,
 .gr-screen-recorder,
-.record-button,
-.overflow-hidden .py-2.px-4.flex.items-center.justify-between { display: none !important; }
-
-/* ── Header ── */
-.itla-header {
-    background: linear-gradient(135deg, #0b2155 0%, #1d4ed8 60%, #1e40af 100%);
-    border-radius: 14px;
-    padding: 22px 28px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 4px 24px rgba(11,33,85,0.18);
-}
-.itla-logo {
-    width: 52px; height: 52px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-    flex-shrink: 0;
-}
-.itla-header-text h1 {
-    margin: 0;
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.3px;
-}
-.itla-header-text p {
-    margin: 2px 0 0;
-    font-size: 0.82rem;
-    color: rgba(255,255,255,0.75);
-}
-.itla-status {
-    margin-left: auto;
-    font-size: 0.78rem;
-    color: rgba(255,255,255,0.7);
-    display: flex; align-items: center; gap: 6px;
-}
-.itla-status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 8px #4ade80;
-    animation: pulse-dot 2s ease-in-out infinite;
-}
-@keyframes pulse-dot {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.4; }
+.record-button {
+    display: none !important;
 }
 
-/* ── Chat panel ── */
-.chat-panel {
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 2px 12px rgba(11,33,85,0.08);
-    overflow: hidden;
-    border: 1px solid #e0e7ff;
+/* Message action buttons */
+[data-testid="chatbot"] button[aria-label],
+[data-testid="chatbot"] button[title],
+.message-actions,
+[class*="message-action"],
+[class*="copy-btn"],
+[class*="share-btn"],
+[class*="edit-btn"] {
+    display: none !important;
 }
 
-/* Chatbot widget overrides */
-.chat-panel .chatbot {
-    background: #fff !important;
-    border: none !important;
-    border-radius: 0 !important;
+/* Main shell */
+#app-shell {
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+    min-height: 100vh !important;
+    flex-wrap: nowrap !important;
 }
 
-/* User bubbles */
-.chat-panel [data-testid="user"] .message,
-.chat-panel .message.user,
-.chat-panel .user-message {
-    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
-    color: #fff !important;
-    border-radius: 16px 16px 4px 16px !important;
-    padding: 10px 16px !important;
-    box-shadow: 0 2px 8px rgba(29,78,216,0.25) !important;
+/* Sidebar */
+#sidebar {
+    width: 285px !important;
+    min-width: 285px !important;
+    max-width: 285px !important;
+    flex: 0 0 285px !important;
+    background: var(--surface) !important;
+    border-right: 1px solid var(--border) !important;
+    padding: 0 !important;
 }
 
-/* Bot bubbles */
-.chat-panel [data-testid="bot"] .message,
-.chat-panel .message.bot,
-.chat-panel .bot-message {
-    background: #f8faff !important;
-    color: #0f172a !important;
-    border-radius: 16px 16px 16px 4px !important;
-    border: 1px solid #e0e7ff !important;
-    padding: 12px 16px !important;
+#sidebar > div {
+    height: 100%;
 }
 
-/* ── Input area ── */
-.input-row {
-    background: #fff;
-    border-top: 1px solid #e0e7ff;
-    padding: 12px 16px;
-    border-radius: 0 0 14px 14px;
-}
-
-.input-row textarea {
-    border-radius: 10px !important;
-    border-color: #c7d2fe !important;
-    background: #f8faff !important;
-    font-size: 0.95rem !important;
-    color: #0f172a !important;
-    transition: border-color 0.15s;
-}
-.input-row textarea:focus {
-    border-color: #4f46e5 !important;
-    box-shadow: 0 0 0 3px rgba(79,70,229,0.12) !important;
-}
-
-/* Send button */
-#send-btn {
-    background: linear-gradient(135deg, #1d4ed8, #4f46e5) !important;
-    color: #fff !important;
-    border: none !important;
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    transition: opacity 0.15s, transform 0.1s !important;
-}
-#send-btn:hover  { opacity: 0.9 !important; transform: translateY(-1px) !important; }
-#send-btn:active { transform: translateY(0) !important; }
-
-/* Clear button */
-#clear-btn {
-    background: transparent !important;
-    color: #64748b !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    font-size: 0.82rem !important;
-    transition: all 0.15s !important;
-}
-#clear-btn:hover {
-    background: #fee2e2 !important;
-    border-color: #fca5a5 !important;
-    color: #dc2626 !important;
-}
-
-/* ── Sidebar ── */
-.sidebar-panel {
+.sidebar-stack {
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
+    gap: 0;
+}
+
+.sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 18px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sb-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    box-shadow: 0 6px 16px rgba(37,99,235,.22);
+}
+
+.sb-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -.2px;
+}
+
+.sb-sub {
+    margin-top: 2px;
+    font-size: .72rem;
+    color: var(--text-dim);
+}
+
+.sb-section-title {
+    padding: 16px 18px 8px;
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-2);
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+.sb-spacer {
+    flex: 1 1 auto;
+}
+
+.sb-footer {
+    margin-top: auto;
+    padding: 16px 18px 18px;
+    border-top: 1px solid var(--border);
+}
+
+.sb-footer-link {
+    display: block;
+    text-decoration: none;
+    color: var(--accent-2);
+    font-weight: 700;
+    font-size: .9rem;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.sb-footer-link:hover {
+    text-decoration: underline;
+}
+
+.sb-footer-copy {
+    text-align: center;
+    font-size: .72rem;
+    color: var(--text-dim);
+}
+
+/* Sidebar buttons */
+.qa-sb-btn button,
+.faq-sb-btn button {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--text-soft) !important;
+    padding: 10px 18px !important;
+    font-family: var(--font) !important;
+    transition: background .16s ease, color .16s ease, padding-left .16s ease !important;
+}
+
+.qa-sb-btn button {
+    font-size: .88rem !important;
+    font-weight: 600 !important;
+}
+
+.faq-sb-btn button {
+    font-size: .82rem !important;
+    font-weight: 500 !important;
+}
+
+.qa-sb-btn button:hover,
+.faq-sb-btn button:hover {
+    background: var(--surface-3) !important;
+    color: var(--text) !important;
+    padding-left: 22px !important;
+}
+
+/* Main content */
+#main-area {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding: 18px 22px 22px !important;
+    background: var(--bg) !important;
+}
+
+#main-area > div {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Header */
+.main-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, #0b2155 0%, #1d4ed8 55%, #2563eb 100%);
+    border-radius: 18px;
+    padding: 18px 22px;
+    box-shadow: 0 10px 30px rgba(11,33,85,.28);
+}
+
+.hdr-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.hdr-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.hdr-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+
+.hdr-title {
+    margin: 0;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -.3px;
+}
+
+.hdr-sub {
+    margin: 3px 0 0;
+    color: rgba(255,255,255,.76);
+    font-size: .8rem;
+}
+
+.hdr-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .8rem;
+    color: #fff;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px;
+    padding: 6px 12px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.hdr-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    background: rgba(255,255,255,.12) !important;
+    color: #fff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 15px !important;
+    transition: background .16s ease !important;
+}
+
+.hdr-btn:hover {
+    background: rgba(255,255,255,.22) !important;
+}
+
+/* Chat wrapper */
+#chat-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Chat panel */
+.chat-panel {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--shadow) !important;
+    overflow: hidden !important;
+}
+
+.chat-panel .chatbot {
+    background: var(--surface) !important;
+    border: none !important;
+}
+
+/* Make the chatbot itself readable */
+.chat-panel [data-testid="bot"] [class*="message"],
+.chat-panel .message.bot,
+.chat-panel .bot {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border-2) !important;
+    color: var(--text) !important;
+    border-radius: 16px 16px 16px 6px !important;
+    box-shadow: none !important;
+}
+
+.chat-panel [data-testid="user"] [class*="message"],
+.chat-panel .message.user,
+.chat-panel .user {
+    background: linear-gradient(135deg, var(--accent), var(--accent-3)) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 16px 16px 6px 16px !important;
+    box-shadow: 0 6px 18px rgba(37,99,235,.25) !important;
+}
+
+/* Critical light-mode readability fixes */
+html[data-theme="light"] .chat-panel {
+    background: #ffffff !important;
+    border-color: #d3dff5 !important;
+}
+
+html[data-theme="light"] .chat-panel .chatbot {
+    background: #ffffff !important;
+}
+
+html[data-theme="light"] .chat-panel [data-testid="bot"] [class*="message"],
+html[data-theme="light"] .chat-panel .message.bot,
+html[data-theme="light"] .chat-panel .bot {
+    background: #f6f9ff !important;
+    border: 1px solid #c8d7f0 !important;
+    color: #16253a !important;
+}
+
+html[data-theme="light"] .chat-panel [data-testid="user"] [class*="message"],
+html[data-theme="light"] .chat-panel .message.user,
+html[data-theme="light"] .chat-panel .user {
+    color: #ffffff !important;
+}
+
+html[data-theme="light"] .chat-panel p,
+html[data-theme="light"] .chat-panel li,
+html[data-theme="light"] .chat-panel span,
+html[data-theme="light"] .chat-panel div {
+    color: inherit !important;
+}
+
+/* Input row */
+.input-row {
+    display: flex !important;
+    gap: 10px !important;
+    align-items: flex-end !important;
+}
+
+.input-row textarea,
+.input-row input,
+textarea {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    font-family: var(--font) !important;
+    font-size: .95rem !important;
+}
+
+.input-row textarea:focus,
+textarea:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.14) !important;
+}
+
+html[data-theme="light"] .input-row textarea,
+html[data-theme="light"] textarea {
+    background: #ffffff !important;
+    color: #16253a !important;
+    border-color: #d0def7 !important;
+}
+
+#send-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent-3)) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-family: var(--font) !important;
+    box-shadow: 0 6px 18px rgba(37,99,235,.22) !important;
+    transition: transform .16s ease, opacity .16s ease !important;
+}
+
+#send-btn:hover {
+    transform: translateY(-1px) !important;
+    opacity: .92 !important;
+}
+
+#clear-btn {
+    width: fit-content !important;
+    background: transparent !important;
+    color: var(--text-dim) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    font-size: .82rem !important;
+    font-family: var(--font) !important;
+}
+
+#clear-btn:hover {
+    background: rgba(239,68,68,.1) !important;
+    color: var(--danger) !important;
+    border-color: var(--danger) !important;
+}
+
+/* About modal */
+.about-card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: 22px;
+    padding: 30px;
+    position: relative;
+    box-shadow: 0 30px 70px rgba(0,0,0,.45);
+    color: var(--text);
+}
+
+.about-x {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--surface-2) !important;
+    color: var(--text-soft) !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer !important;
+}
+
+.about-hdr {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.about-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.about-name {
+    font-size: 1.16rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.about-tagline {
+    margin-top: 2px;
+    font-size: .8rem;
+    color: var(--text-soft);
+}
+
+.about-desc {
+    color: var(--text-soft);
+    font-size: .9rem;
+    line-height: 1.65;
+    margin-bottom: 18px;
+}
+
+.about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.about-chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.about-chip-green {
+    border-color: rgba(34,197,94,.25);
+    background: rgba(34,197,94,.06);
+}
+
+.chip-lbl {
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--accent-2);
+    margin-bottom: 4px;
+}
+
+.chip-val {
+    font-size: .86rem;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.about-actions {
+    display: flex;
     gap: 10px;
 }
 
-.sidebar-section {
-    background: #fff;
+.about-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     border-radius: 12px;
-    border: 1px solid #e0e7ff;
-    overflow: hidden;
-    box-shadow: 0 1px 6px rgba(11,33,85,0.05);
-}
-
-.sidebar-title {
-    background: #f8faff;
-    border-bottom: 1px solid #e0e7ff;
-    padding: 10px 14px;
-    font-size: 0.78rem;
+    padding: 11px;
+    text-decoration: none;
+    font-size: .86rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: #4f46e5;
-    margin: 0;
+    transition: transform .16s ease, opacity .16s ease;
 }
 
-/* Quick action buttons */
-.qa-btn button {
-    width: 100% !important;
-    background: #fff !important;
-    color: #1e3a8a !important;
-    border: none !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    border-radius: 0 !important;
-    text-align: left !important;
-    padding: 10px 14px !important;
-    font-size: 0.86rem !important;
-    font-weight: 500 !important;
-    transition: background 0.12s, color 0.12s !important;
-    justify-content: flex-start !important;
+.about-ghost {
+    background: var(--surface-2);
+    color: var(--text-soft);
+    border: 1px solid var(--border);
 }
-.qa-btn button:hover {
-    background: #eff6ff !important;
-    color: #1d4ed8 !important;
+
+.about-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-3));
+    color: #ffffff;
+    border: none;
 }
-.qa-btn:last-child button { border-bottom: none !important; }
 
-/* FAQ buttons */
-.faq-btn button {
-    width: 100% !important;
-    background: #fff !important;
-    color: #374151 !important;
-    border: none !important;
-    border-bottom: 1px solid #f9fafb !important;
-    border-radius: 0 !important;
-    text-align: left !important;
-    padding: 8px 14px !important;
-    font-size: 0.82rem !important;
-    transition: background 0.12s !important;
-    justify-content: flex-start !important;
+.about-btn:hover {
+    transform: translateY(-1px);
+    opacity: .94;
 }
-.faq-btn button:hover {
-    background: #f0f4ff !important;
-    color: #1d4ed8 !important;
+
+/* Responsive */
+@media (max-width: 980px) {
+    #sidebar {
+        width: 240px !important;
+        min-width: 240px !important;
+        max-width: 240px !important;
+        flex-basis: 240px !important;
+    }
 }
-.faq-btn:last-child button { border-bottom: none !important; }
 
-/* ── Footer ── */
-.itla-footer {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.78rem;
-    padding: 10px 0 2px;
-}
-.itla-footer a { color: #6366f1; text-decoration: none; }
-.itla-footer a:hover { text-decoration: underline; }
-
-/* ── Dark mode ── */
-@media (prefers-color-scheme: dark) {
-    .gradio-container, body { background: #0d1117 !important; }
-
-    .chat-panel,
-    .sidebar-section { background: #161b27 !important; border-color: #2d3a55 !important; }
-
-    .sidebar-title { background: #1a2236 !important; border-color: #2d3a55 !important; color: #818cf8 !important; }
-
-    .input-row { background: #161b27 !important; border-color: #2d3a55 !important; }
-    .input-row textarea { background: #1a2236 !important; color: #e2e8f0 !important; border-color: #2d3a55 !important; }
-
-    .chat-panel .chatbot { background: #161b27 !important; }
-
-    /* Dark bot bubbles */
-    .chat-panel [data-testid="bot"] .message,
-    .chat-panel .message.bot,
-    .chat-panel .bot-message {
-        background: #1a2236 !important;
-        color: #e2e8f0 !important;
-        border-color: #2d3a55 !important;
+@media (max-width: 760px) {
+    #sidebar {
+        display: none !important;
     }
 
-    .qa-btn button  { background: #161b27 !important; color: #93c5fd !important; border-color: #1e2d47 !important; }
-    .qa-btn button:hover { background: #1e2d47 !important; }
+    #main-area {
+        padding: 14px !important;
+    }
 
-    .faq-btn button { background: #161b27 !important; color: #9ca3af !important; border-color: #1e2d47 !important; }
-    .faq-btn button:hover { background: #1e2d47 !important; color: #93c5fd !important; }
+    .about-grid {
+        grid-template-columns: 1fr;
+    }
 
-    #clear-btn { color: #9ca3af !important; border-color: #2d3a55 !important; }
-    #clear-btn:hover { background: #3b1212 !important; border-color: #7f1d1d !important; color: #fca5a5 !important; }
+    .about-actions {
+        flex-direction: column;
+    }
+}
+/* ===== SAFE FINAL UI FIXES ===== */
 
-    .itla-footer { color: #4b5563 !important; }
+html,
+body,
+.gradio-container {
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+}
+
+#app-shell {
+    min-height: 100vh !important;
+    display: flex !important;
+    align-items: stretch !important;
+    overflow: visible !important;
+}
+
+#sidebar {
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+}
+
+#main-area {
+    min-height: 100vh !important;
+    overflow: visible !important;
+}
+
+#main-area > div {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+}
+
+.chat-panel {
+    display: block !important;
+    min-height: 520px !important;
+    max-height: 620px !important;
+    overflow: hidden !important;
+}
+
+#chatbot-main {
+    min-height: 520px !important;
+}
+
+/* Hide Gradio chat action buttons */
+#chatbot-main button[title],
+#chatbot-main button[aria-label],
+#chatbot-main [class*="copy"],
+#chatbot-main [class*="share"],
+#chatbot-main [class*="delete"],
+#chatbot-main [class*="trash"],
+#chatbot-main [class*="message-action"],
+#chatbot-main [class*="message-button"] {
+    display: none !important;
+}
+
+/* Remove double border feel */
+#chatbot-main [data-testid="bot"] [class*="message"],
+#chatbot-main .bot,
+#chatbot-main .message.bot {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: var(--surface-2) !important;
+}
+
+/* Text readability */
+#chatbot-main p,
+#chatbot-main li,
+#chatbot-main span,
+#chatbot-main div,
+#chatbot-main strong,
+#chatbot-main b {
+    color: var(--text) !important;
+}
+
+#chatbot-main strong,
+#chatbot-main b {
+    font-weight: 800 !important;
+}
+
+#chatbot-main li::marker {
+    color: var(--accent-2) !important;
+}
+
+/* Light mode readability */
+html[data-theme="light"] #chatbot-main [data-testid="bot"] [class*="message"],
+html[data-theme="light"] #chatbot-main .bot,
+html[data-theme="light"] #chatbot-main .message.bot {
+    background: #ffffff !important;
+    color: #111827 !important;
+}
+
+html[data-theme="light"] #chatbot-main p,
+html[data-theme="light"] #chatbot-main li,
+html[data-theme="light"] #chatbot-main span,
+html[data-theme="light"] #chatbot-main div,
+html[data-theme="light"] #chatbot-main strong,
+html[data-theme="light"] #chatbot-main b {
+    color: #111827 !important;
+}
+
+html[data-theme="light"] .sb-section-title {
+    background: #0f1e35 !important;
+    color: #60a5fa !important;
+}
+
+html[data-theme="light"] .qa-sb-btn button,
+html[data-theme="light"] .faq-sb-btn button {
+    background: #f8fbff !important;
+    color: #111827 !important;
+}
+
+#send-btn {
+    min-height: 44px !important;
+    max-height: 52px !important;
+}
+/* ===== READABILITY PATCH ===== */
+
+#chatbot-main,
+#chatbot-main * {
+    text-shadow: none !important;
+}
+
+/* Bot bubble: base readable */
+#chatbot-main [data-testid="bot"] [class*="message"],
+#chatbot-main .message.bot,
+#chatbot-main .bot {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+}
+
+/* Force markdown text readable */
+#chatbot-main p,
+#chatbot-main li,
+#chatbot-main span,
+#chatbot-main div,
+#chatbot-main strong,
+#chatbot-main b,
+#chatbot-main em,
+#chatbot-main i,
+#chatbot-main blockquote,
+#chatbot-main a {
+    color: var(--text) !important;
+    opacity: 1 !important;
+}
+
+#chatbot-main a {
+    text-decoration: underline !important;
+    color: var(--accent-2) !important;
+}
+
+#chatbot-main blockquote {
+    border-left: 4px solid var(--accent-2) !important;
+    background: rgba(59, 130, 246, 0.08) !important;
+    padding: 8px 12px !important;
+    margin: 12px 0 0 !important;
+    border-radius: 8px !important;
+}
+
+/* Light mode: readable bot messages */
+html[data-theme="light"] #chatbot-main [data-testid="bot"] [class*="message"],
+html[data-theme="light"] #chatbot-main .message.bot,
+html[data-theme="light"] #chatbot-main .bot {
+    background: #f8fbff !important;
+    color: #111827 !important;
+}
+
+html[data-theme="light"] #chatbot-main p,
+html[data-theme="light"] #chatbot-main li,
+html[data-theme="light"] #chatbot-main span,
+html[data-theme="light"] #chatbot-main div,
+html[data-theme="light"] #chatbot-main strong,
+html[data-theme="light"] #chatbot-main b,
+html[data-theme="light"] #chatbot-main em,
+html[data-theme="light"] #chatbot-main i,
+html[data-theme="light"] #chatbot-main blockquote {
+    color: #111827 !important;
+    opacity: 1 !important;
+}
+
+html[data-theme="light"] #chatbot-main a {
+    color: #1d4ed8 !important;
+    opacity: 1 !important;
+}
+
+html[data-theme="light"] #chatbot-main blockquote {
+    background: #eaf2ff !important;
+    border-left-color: #2563eb !important;
+}
+
+/* Prevent invisible footer notes inside bubbles */
+html[data-theme="light"] #chatbot-main em,
+html[data-theme="light"] #chatbot-main i {
+    color: #374151 !important;
 }
 """
 
 # ── Chat functions ─────────────────────────────────────────────────────────────
-
 def _stream_response(msg: str, hist: list):
-    """Generator: typing indicator → wait for model → real response."""
     msg = msg.strip()
     if not msg:
         yield hist, hist, ""
         return
 
-    # Step 1 — show typing indicator immediately
-    pending = list(hist or []) + [
-        _user_msg(msg),
-        _assistant_msg("✍️ *Escribiendo...*"),
-    ]
-    yield pending, hist, ""
+    yield list(hist) + [_um(msg), _am("✍️ *Escribiendo...*")], hist, ""
 
-    # Step 2 — handle cold start (only first run)
     if not _bot_ready.is_set():
-        loading = list(hist or []) + [
-            _user_msg(msg),
-            _assistant_msg(_LOADING_MSG),
-        ]
-        yield loading, hist, ""
+        yield list(hist) + [_um(msg), _am(_LOADING_MSG)], hist, ""
         _bot_ready.wait(timeout=180)
 
     if _bot is None:
-        err = list(hist or []) + [
-            _user_msg(msg),
-            _assistant_msg("❌ No se pudo iniciar el asistente. Recarga la página."),
-        ]
+        err = list(hist) + [_um(msg), _am("❌ No se pudo iniciar el asistente. Recarga la página.")]
         yield err, err, ""
         return
 
-    # Step 3 — real response
     response, confidence = _bot.respond(msg)
     badge = _CONFIDENCE_BADGES.get(confidence, "")
-    new_hist = list(hist or []) + [
-        _user_msg(msg),
-        _assistant_msg(response + badge),
-    ]
+    new_hist = list(hist) + [_um(msg), _am(response + badge)]
     yield new_hist, new_hist, ""
 
 
 def _quick_reply(question: str, hist: list) -> tuple[list, list]:
-    result_hist = hist
+    result = hist
     for _, s, _ in _stream_response(question, hist):
-        result_hist = s
-    return result_hist, result_hist
+        result = s
+    return result, result
 
 
-def _clear() -> tuple[list, list, str]:
+def _clear(hist: list) -> tuple[list, list, str]:
+    if not any(m.get("role") == "user" for m in (hist or [])):
+        return hist, hist, ""
     return list(_INIT_HISTORY), list(_INIT_HISTORY), ""
 
 
 # ── Build UI ───────────────────────────────────────────────────────────────────
-
 def make_demo() -> gr.Blocks:
-    # CSS is in launch(), not Blocks() — required by Gradio 6
-    with gr.Blocks(title="Asistente ITLA") as demo:
+    with gr.Blocks(title="ITLA · Asistente Virtual", head=_JS_HEAD) as demo:
         demo.queue()
-
-        gr.HTML("""
-        <div class="itla-header">
-            <div class="itla-logo">🎓</div>
-            <div class="itla-header-text">
-                <h1>Asistente Virtual del ITLA</h1>
-                <p>Instituto Tecnológico de Las Américas · IA local y gratuita</p>
-            </div>
-            <div class="itla-status">
-                <div class="itla-status-dot"></div>
-                En línea
-            </div>
-        </div>
-        """)
-
+        gr.HTML(_ABOUT_MODAL)
         state = gr.State(list(_INIT_HISTORY))
 
-        with gr.Row(equal_height=False):
+        with gr.Row(elem_id="app-shell", equal_height=False):
+            with gr.Column(elem_id="sidebar", scale=0):
+                with gr.Group(elem_classes="sidebar-stack"):
+                    gr.HTML(_SIDEBAR_BRAND)
+                    gr.HTML('<div class="sb-section-title">⚡ Acceso Rápido</div>')
+                    qa_buttons: list[tuple[str, gr.Button]] = []
+                    for label in QUICK_ACTIONS:
+                        b = gr.Button(label, elem_classes="qa-sb-btn", size="sm")
+                        qa_buttons.append((label, b))
 
-            # ── Left: chat ───────────────────────────────────────────────────
-            with gr.Column(scale=3):
-                with gr.Group(elem_classes="chat-panel"):
-                    # No type=, bubble_full_width, show_share_button,
-                    # show_copy_button, or avatar_images — not supported here
-                    chatbot_ui = gr.Chatbot(
-                        value=list(_INIT_HISTORY),
-                        height=460,
-                        show_label=False,
+                    gr.HTML('<div class="sb-section-title">💬 Preguntas Frecuentes</div>')
+                    faq_buttons: list[tuple[str, gr.Button]] = []
+                    for q in FAQS:
+                        b = gr.Button(q, elem_classes="faq-sb-btn", size="sm")
+                        faq_buttons.append((q, b))
+
+                    gr.HTML('<div class="sb-spacer"></div>')
+                    gr.HTML(
+                        """
+                        <div class="sb-footer">
+                            <a href="https://www.itla.edu.do" target="_blank" class="sb-footer-link">🌐 itla.edu.do</a>
+                            <div class="sb-footer-copy">ITLA Chatbot · Proyecto académico</div>
+                        </div>
+                        """
                     )
+
+            with gr.Column(elem_id="main-area", scale=1):
+                gr.HTML(_HEADER_HTML)
+
+                with gr.Group(elem_classes="chat-panel"):
+                    chatbot_ui = gr.Chatbot(
+    value=list(_INIT_HISTORY),
+    height=520,
+    show_label=False,
+    elem_id="chatbot-main",
+)
 
                 with gr.Row(elem_classes="input-row"):
                     txt_in = gr.Textbox(
@@ -465,58 +1140,24 @@ def make_demo() -> gr.Blocks:
                         lines=1,
                         max_lines=4,
                     )
-                    send_btn = gr.Button("Enviar ➤", scale=1, elem_id="send-btn", min_width=90)
+                    send_btn = gr.Button("Enviar ➤", elem_id="send-btn", scale=1, min_width=120)
 
                 clear_btn = gr.Button("🗑️ Limpiar conversación", elem_id="clear-btn", size="sm")
 
-            # ── Right: sidebar ───────────────────────────────────────────────
-            with gr.Column(scale=1, min_width=210, elem_classes="sidebar-panel"):
-
-                with gr.Group(elem_classes="sidebar-section"):
-                    gr.HTML('<p class="sidebar-title">⚡ Acceso rápido</p>')
-                    qa_buttons = []
-                    for label in QUICK_ACTIONS:
-                        b = gr.Button(label, elem_classes="qa-btn", size="sm")
-                        qa_buttons.append((label, b))
-
-                with gr.Group(elem_classes="sidebar-section"):
-                    gr.HTML('<p class="sidebar-title">💬 Preguntas frecuentes</p>')
-                    faq_buttons = []
-                    for q in FAQS:
-                        b = gr.Button(q, elem_classes="faq-btn", size="sm")
-                        faq_buttons.append((q, b))
-
-        gr.HTML(
-            '<div class="itla-footer">'
-            'ITLA Chatbot · Proyecto académico · '
-            '<a href="https://www.itla.edu.do" target="_blank">itla.edu.do</a>'
-            '</div>'
-        )
-
-        # ── Event wiring ──────────────────────────────────────────────────────
-
         def _submit(msg, hist):
-            for chat_val, st_val, txt_val in _stream_response(msg, hist):
-                yield chat_val, st_val, txt_val
+            for cv, sv, tv in _stream_response(msg, hist):
+                yield cv, sv, tv
 
-        txt_in.submit(_submit,   [txt_in, state], [chatbot_ui, state, txt_in])
-        send_btn.click(_submit,  [txt_in, state], [chatbot_ui, state, txt_in])
-        clear_btn.click(_clear,  None,            [chatbot_ui, state, txt_in])
+        txt_in.submit(_submit, [txt_in, state], [chatbot_ui, state, txt_in])
+        send_btn.click(_submit, [txt_in, state], [chatbot_ui, state, txt_in])
+        clear_btn.click(_clear, [state], [chatbot_ui, state, txt_in])
 
         for label, btn in qa_buttons:
             q = QUICK_ACTIONS[label]
-            btn.click(
-                fn=lambda hist, _q=q: _quick_reply(_q, hist),
-                inputs=[state],
-                outputs=[chatbot_ui, state],
-            )
+            btn.click(fn=lambda h, _q=q: _quick_reply(_q, h), inputs=[state], outputs=[chatbot_ui, state])
 
         for question, btn in faq_buttons:
-            btn.click(
-                fn=lambda hist, _q=question: _quick_reply(_q, hist),
-                inputs=[state],
-                outputs=[chatbot_ui, state],
-            )
+            btn.click(fn=lambda h, _q=question: _quick_reply(_q, h), inputs=[state], outputs=[chatbot_ui, state])
 
     return demo
 
