@@ -1,37 +1,43 @@
 """
-ITLA Chatbot — Premium UI
-Compatible with your current Gradio setup:
-- message history as {"role": "...", "content": "..."}
-- no type= on gr.Chatbot
-- no bubble_full_width
-- no show_api in launch()
-- CSS injected in launch()
+Chatbot del ITLA — Interfaz Premium con Gradio
+Compatible con la configuración actual de Gradio:
+- Historial de mensajes como {"role": "...", "content": "..."}
+- Sin type= en gr.Chatbot
+- Sin bubble_full_width
+- Sin show_api en launch()
+- CSS inyectado en launch()
 """
 
 from __future__ import annotations
 
-import threading
+import threading  # Para cargar el bot en segundo plano sin bloquear la UI
 
-import gradio as gr
+import gradio as gr  # Framework para construir la interfaz web
 
-from chatbot import ChatBot
+from chatbot import ChatBot  # Módulo principal con la lógica del chatbot
 
+# URL del perfil de GitHub del autor del proyecto
 GITHUB_PROFILE_URL = "https://github.com/DmeshellHeredia"
 
-# ── Background loading ────────────────────────────────────────────────────────
-_bot: ChatBot | None = None
-_bot_ready = threading.Event()
+# ── Carga en segundo plano ────────────────────────────────────────────────────
+# El bot se inicializa en un hilo separado para que la interfaz cargue rápido
+# mientras el motor semántico (FAISS + sentence-transformers) se prepara
+_bot: ChatBot | None = None          # Instancia global del chatbot (None hasta que esté listo)
+_bot_ready = threading.Event()        # Evento para sincronizar: se activa cuando el bot está listo
 
 
 def _load():
+    """Inicializa el ChatBot con búsqueda semántica activada y señala que está listo."""
     global _bot
-    _bot = ChatBot(use_semantic=True)
-    _bot_ready.set()
+    _bot = ChatBot(use_semantic=True)  # Carga los embeddings y el índice FAISS
+    _bot_ready.set()                   # Desbloquea cualquier hilo que esté esperando
 
 
+# Arranca el hilo de carga en modo daemon (se cierra solo cuando termina el programa)
 threading.Thread(target=_load, daemon=True).start()
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# ── Constantes de la interfaz ─────────────────────────────────────────────────
+# Mensaje de bienvenida que aparece al abrir el chatbot por primera vez
 _INITIAL_MSG = (
     "¡Hola! 👋 Soy el asistente virtual del **ITLA**.\n\n"
     "Puedo ayudarte con información sobre:\n"
@@ -43,11 +49,17 @@ _INITIAL_MSG = (
     "¿En qué te puedo ayudar hoy?"
 )
 
+# Mensaje que se muestra mientras el motor semántico todavía está cargando
 _LOADING_MSG = (
     "⏳ *Iniciando el motor semántico por primera vez...* "
     "Esto puede tardar 20–30 segundos. Solo ocurre en el primer arranque."
 )
 
+# Etiquetas de confianza que se añaden al final de cada respuesta según el nivel de certeza
+# - "high"    → sin etiqueta (la respuesta es fiable)
+# - "medium"  → aviso de respuesta aproximada
+# - "low"     → aviso de confianza baja con enlace al sitio oficial
+# - "fallback"→ sin etiqueta (el bot usó respuesta de reserva)
 _CONFIDENCE_BADGES = {
     "high": "",
     "medium": "\n\n> 💡 *Respuesta aproximada — reformula si necesitas más detalle.*",
@@ -56,17 +68,22 @@ _CONFIDENCE_BADGES = {
 }
 
 
+# Funciones auxiliares para crear mensajes con el formato de Gradio
 def _am(content: str) -> dict:
+    """Crea un mensaje del asistente con el formato esperado por gr.Chatbot."""
     return {"role": "assistant", "content": content}
 
 
 def _um(content: str) -> dict:
+    """Crea un mensaje del usuario con el formato esperado por gr.Chatbot."""
     return {"role": "user", "content": content}
 
 
+# Historial inicial: solo contiene el mensaje de bienvenida del asistente
 _INIT_HISTORY: list[dict] = [_am(_INITIAL_MSG)]
 
-# ── Sidebar data ──────────────────────────────────────────────────────────────
+# ── Datos de la barra lateral ──────────────────────────────────────────────────
+# Acciones rápidas: botones con un label visible y la pregunta que envían al bot
 QUICK_ACTIONS = {
     "📚 Oferta Académica": "¿Cuáles carreras ofrecen en el ITLA?",
     "📝 Inscripción": "¿Cómo es el proceso de inscripción?",
@@ -76,6 +93,7 @@ QUICK_ACTIONS = {
     "🗺️ Sedes": "¿En qué provincias tienen sedes?",
 }
 
+# Preguntas frecuentes que aparecen como botones en la barra lateral
 FAQS = [
     "¿Qué es el ITLA?",
     "¿Cuáles carreras ofrecen?",
@@ -87,14 +105,21 @@ FAQS = [
     "¿Hay becas disponibles?",
 ]
 
-# ── JS injected into <head> ───────────────────────────────────────────────────
+# ── JavaScript inyectado en el <head> del HTML ────────────────────────────────
+# Este bloque JS se ejecuta antes de que cargue la UI completa para:
+# 1. Restaurar el tema guardado en localStorage (evita parpadeo de tema)
+# 2. Sincronizar el ícono del botón de tema con el modo activo
+# 3. Alternar entre modo oscuro y modo claro al presionar el botón
+# 4. Abrir y cerrar el modal "Acerca del proyecto"
 _JS_HEAD = """
 <script>
 (function () {
+    // Aplica el tema guardado antes de que se pinte la página para evitar parpadeo
     const saved = localStorage.getItem("itla-theme") || "dark";
     document.documentElement.setAttribute("data-theme", saved);
 })();
 
+// Actualiza el ícono del botón según el tema activo (☀️ oscuro → 🌙 claro)
 function syncThemeIcon() {
     const icon = document.getElementById("theme-icon");
     if (!icon) return;
@@ -102,6 +127,7 @@ function syncThemeIcon() {
     icon.textContent = theme === "dark" ? "☀️" : "🌙";
 }
 
+// Alterna entre tema oscuro y claro; persiste la elección en localStorage
 function toggleTheme() {
     const root = document.documentElement;
     const current = root.getAttribute("data-theme") || "dark";
@@ -111,22 +137,28 @@ function toggleTheme() {
     syncThemeIcon();
 }
 
+// Muestra el modal "Acerca del proyecto"
 function openAbout() {
     const modal = document.getElementById("about-overlay");
     if (modal) modal.style.display = "flex";
 }
 
+// Oculta el modal "Acerca del proyecto"
 function closeAbout() {
     const modal = document.getElementById("about-overlay");
     if (modal) modal.style.display = "none";
 }
 
+// Sincroniza el ícono al cargar la página y al terminar de cargar todos los recursos
 document.addEventListener("DOMContentLoaded", syncThemeIcon);
 window.addEventListener("load", syncThemeIcon);
 </script>
 """
 
-# ── HTML fragments ────────────────────────────────────────────────────────────
+# ── Fragmentos HTML estáticos ─────────────────────────────────────────────────
+# Modal informativo "Acerca del proyecto" — se muestra al presionar el botón ℹ️ del header.
+# Contiene descripción, tecnologías usadas y enlaces externos.
+# El overlay cierra si se hace clic fuera de la tarjeta (onclick en el fondo).
 _ABOUT_MODAL = f"""
 <div id="about-overlay"
      onclick="if(event.target===this)closeAbout()"
@@ -177,6 +209,7 @@ _ABOUT_MODAL = f"""
 </div>
 """
 
+# Logo y nombre del ITLA que aparece en la parte superior de la barra lateral
 _SIDEBAR_BRAND = """
 <div class="sb-brand">
     <div class="sb-logo">🎓</div>
@@ -187,6 +220,8 @@ _SIDEBAR_BRAND = """
 </div>
 """
 
+# Encabezado principal de la sección de chat:
+# muestra nombre, subtítulo, indicador de estado en línea y botones de tema/info
 _HEADER_HTML = """
 <div class="main-header">
     <div class="hdr-left">
@@ -208,10 +243,21 @@ _HEADER_HTML = """
 </div>
 """
 
-# ── CSS ────────────────────────────────────────────────────────────────────────
+# ── Estilos CSS ────────────────────────────────────────────────────────────────
+# Toda la hoja de estilos de la aplicación. Está organizada en secciones:
+# 1. Variables de diseño (colores, sombras, tipografía)
+# 2. Tema claro (sobreescribe las variables del tema oscuro)
+# 3. Reset y base
+# 4. Contenedor Gradio (ancho completo sin romper el layout)
+# 5. Ocultar elementos de la UI de Gradio que no queremos mostrar
+# 6. Estructura principal (shell, sidebar, área principal)
+# 7. Componentes: encabezado, chat, input, modal, botones
+# 8. Parches de legibilidad (texto visible en ambos temas)
+# 9. Diseño responsivo (breakpoints para tablets y móviles)
 CSS = r"""
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
+/* ── Variables del tema oscuro (valores por defecto) ── */
 :root {
     --bg: #071224;
     --surface: #0b1628;
@@ -232,6 +278,7 @@ CSS = r"""
     --font: 'Outfit', system-ui, sans-serif;
 }
 
+/* ── Variables del tema claro (sobreescribe las de arriba) ── */
 html[data-theme="light"] {
     --bg: #eef4ff;
     --surface: #ffffff;
@@ -248,12 +295,14 @@ html[data-theme="light"] {
     --shadow: 0 10px 28px rgba(37, 99, 235, .08);
 }
 
+/* ── Reset de box-sizing para todos los elementos ── */
 *,
 *::before,
 *::after {
     box-sizing: border-box;
 }
 
+/* ── Base: fondo y tipografía globales ── */
 html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -263,7 +312,7 @@ html, body {
     font-family: var(--font) !important;
 }
 
-/* Full width without breaking layout */
+/* ── Contenedor Gradio: ancho completo sin romper el layout ── */
 .gradio-container,
 .gradio-container .main,
 .gradio-container .contain,
@@ -276,7 +325,7 @@ html, body {
     background: var(--bg) !important;
 }
 
-/* Hide most Gradio chrome */
+/* ── Ocultar elementos nativos de Gradio que no forman parte del diseño ── */
 footer,
 .gradio-container > footer,
 button.share-button,
@@ -301,7 +350,7 @@ button[aria-label*="API"],
     display: none !important;
 }
 
-/* Message action buttons */
+/* ── Ocultar botones de acción sobre mensajes del chat (copiar, compartir, editar) ── */
 [data-testid="chatbot"] button[aria-label],
 [data-testid="chatbot"] button[title],
 .message-actions,
@@ -312,7 +361,7 @@ button[aria-label*="API"],
     display: none !important;
 }
 
-/* Main shell */
+/* ── Shell principal: layout de dos columnas (sidebar + contenido) ── */
 #app-shell {
     display: flex !important;
     align-items: stretch !important;
@@ -321,7 +370,7 @@ button[aria-label*="API"],
     flex-wrap: nowrap !important;
 }
 
-/* Sidebar */
+/* ── Barra lateral: ancho fijo, no crece ni se encoge ── */
 #sidebar {
     width: 285px !important;
     min-width: 285px !important;
@@ -336,6 +385,7 @@ button[aria-label*="API"],
     height: 100%;
 }
 
+/* Columna flexible dentro del sidebar para empujar el footer hacia abajo */
 .sidebar-stack {
     min-height: 100vh;
     display: flex;
@@ -343,6 +393,7 @@ button[aria-label*="API"],
     gap: 0;
 }
 
+/* ── Marca/logo en la parte superior del sidebar ── */
 .sb-brand {
     display: flex;
     align-items: center;
@@ -376,6 +427,7 @@ button[aria-label*="API"],
     color: var(--text-dim);
 }
 
+/* ── Encabezados de sección dentro del sidebar ── */
 .sb-section-title {
     padding: 16px 18px 8px;
     font-size: .7rem;
@@ -387,10 +439,12 @@ button[aria-label*="API"],
     background: var(--surface-2);
 }
 
+/* Espaciador flexible: empuja el footer al fondo del sidebar */
 .sb-spacer {
     flex: 1 1 auto;
 }
 
+/* ── Footer del sidebar con enlace al sitio oficial y nota de copyright ── */
 .sb-footer {
     margin-top: auto;
     padding: 16px 18px 18px;
@@ -417,7 +471,8 @@ button[aria-label*="API"],
     color: var(--text-dim);
 }
 
-/* Sidebar buttons */
+/* ── Botones de acciones rápidas y preguntas frecuentes en el sidebar ── */
+/* Alineados a la izquierda, sin borde propio, con animación de deslizamiento al hacer hover */
 .qa-sb-btn button,
 .faq-sb-btn button {
     width: 100% !important;
@@ -433,16 +488,19 @@ button[aria-label*="API"],
     transition: background .16s ease, color .16s ease, padding-left .16s ease !important;
 }
 
+/* Acciones rápidas: texto más grande y en negrita */
 .qa-sb-btn button {
     font-size: .88rem !important;
     font-weight: 600 !important;
 }
 
+/* Preguntas frecuentes: texto más pequeño y peso normal */
 .faq-sb-btn button {
     font-size: .82rem !important;
     font-weight: 500 !important;
 }
 
+/* Efecto hover: fondo destacado y ligero desplazamiento del texto */
 .qa-sb-btn button:hover,
 .faq-sb-btn button:hover {
     background: var(--surface-3) !important;
@@ -450,7 +508,7 @@ button[aria-label*="API"],
     padding-left: 22px !important;
 }
 
-/* Main content */
+/* ── Área de contenido principal (columna derecha) ── */
 #main-area {
     flex: 1 1 auto !important;
     min-width: 0 !important;
@@ -464,7 +522,7 @@ button[aria-label*="API"],
     gap: 14px;
 }
 
-/* Header */
+/* ── Encabezado principal con gradiente azul ── */
 .main-header {
     display: flex;
     align-items: center;
@@ -490,6 +548,7 @@ button[aria-label*="API"],
     flex-shrink: 0;
 }
 
+/* Ícono del robot en el encabezado */
 .hdr-icon {
     width: 46px;
     height: 46px;
@@ -515,6 +574,7 @@ button[aria-label*="API"],
     font-size: .8rem;
 }
 
+/* Indicador de estado "En línea" con píldora semitransparente */
 .hdr-status {
     display: flex;
     align-items: center;
@@ -527,6 +587,7 @@ button[aria-label*="API"],
     padding: 6px 12px;
 }
 
+/* Punto verde animado que indica estado activo */
 .status-dot {
     width: 8px;
     height: 8px;
@@ -535,6 +596,7 @@ button[aria-label*="API"],
     box-shadow: 0 0 8px var(--success);
 }
 
+/* Botones del encabezado (tema e info) */
 .hdr-btn {
     width: 36px;
     height: 36px;
@@ -554,14 +616,14 @@ button[aria-label*="API"],
     background: rgba(255,255,255,.22) !important;
 }
 
-/* Chat wrapper */
+/* ── Envoltorio del chat: columna con espacio entre panel e input ── */
 #chat-wrap {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-/* Chat panel */
+/* ── Panel del chat: tarjeta con borde y sombra ── */
 .chat-panel {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -575,7 +637,8 @@ button[aria-label*="API"],
     border: none !important;
 }
 
-/* Make the chatbot itself readable */
+/* ── Burbujas de mensajes del chatbot ── */
+/* Burbuja del asistente: fondo oscuro secundario con borde */
 .chat-panel [data-testid="bot"] [class*="message"],
 .chat-panel .message.bot,
 .chat-panel .bot {
@@ -586,6 +649,7 @@ button[aria-label*="API"],
     box-shadow: none !important;
 }
 
+/* Burbuja del usuario: gradiente azul con sombra sutil */
 .chat-panel [data-testid="user"] [class*="message"],
 .chat-panel .message.user,
 .chat-panel .user {
@@ -596,7 +660,7 @@ button[aria-label*="API"],
     box-shadow: 0 6px 18px rgba(37,99,235,.25) !important;
 }
 
-/* Critical light-mode readability fixes */
+/* ── Correcciones de legibilidad en modo claro para el panel del chat ── */
 html[data-theme="light"] .chat-panel {
     background: #ffffff !important;
     border-color: #d3dff5 !important;
@@ -620,6 +684,7 @@ html[data-theme="light"] .chat-panel .user {
     color: #ffffff !important;
 }
 
+/* Hereda el color del contenedor en lugar de forzar uno propio */
 html[data-theme="light"] .chat-panel p,
 html[data-theme="light"] .chat-panel li,
 html[data-theme="light"] .chat-panel span,
@@ -627,13 +692,14 @@ html[data-theme="light"] .chat-panel div {
     color: inherit !important;
 }
 
-/* Input row */
+/* ── Fila de entrada de texto ── */
 .input-row {
     display: flex !important;
     gap: 10px !important;
     align-items: flex-end !important;
 }
 
+/* Estilo compartido para textarea e input de texto */
 .input-row textarea,
 .input-row input,
 textarea {
@@ -645,12 +711,14 @@ textarea {
     font-size: .95rem !important;
 }
 
+/* Resaltado azul al enfocar el campo de texto */
 .input-row textarea:focus,
 textarea:focus {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 3px rgba(37,99,235,.14) !important;
 }
 
+/* Ajuste de colores del textarea en modo claro */
 html[data-theme="light"] .input-row textarea,
 html[data-theme="light"] textarea {
     background: #ffffff !important;
@@ -658,6 +726,7 @@ html[data-theme="light"] textarea {
     border-color: #d0def7 !important;
 }
 
+/* Botón "Enviar": gradiente azul con efecto de elevación al hacer hover */
 #send-btn {
     background: linear-gradient(135deg, var(--accent), var(--accent-3)) !important;
     color: #ffffff !important;
@@ -674,6 +743,7 @@ html[data-theme="light"] textarea {
     opacity: .92 !important;
 }
 
+/* Botón "Limpiar conversación": sutil, se vuelve rojo al hacer hover */
 #clear-btn {
     width: fit-content !important;
     background: transparent !important;
@@ -690,7 +760,7 @@ html[data-theme="light"] textarea {
     border-color: var(--danger) !important;
 }
 
-/* About modal */
+/* ── Modal "Acerca del proyecto" ── */
 .about-card {
     width: 100%;
     max-width: 520px;
@@ -703,6 +773,7 @@ html[data-theme="light"] textarea {
     color: var(--text);
 }
 
+/* Botón de cierre (X) posicionado en la esquina superior derecha */
 .about-x {
     position: absolute;
     top: 14px;
@@ -719,6 +790,7 @@ html[data-theme="light"] textarea {
     cursor: pointer !important;
 }
 
+/* Encabezado del modal: ícono + nombre del proyecto */
 .about-hdr {
     display: flex;
     align-items: center;
@@ -756,6 +828,7 @@ html[data-theme="light"] textarea {
     margin-bottom: 18px;
 }
 
+/* Cuadrícula de chips con información técnica del proyecto */
 .about-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -770,6 +843,7 @@ html[data-theme="light"] textarea {
     padding: 12px;
 }
 
+/* Chip especial con acento verde para la sección de privacidad */
 .about-chip-green {
     border-color: rgba(34,197,94,.25);
     background: rgba(34,197,94,.06);
@@ -790,6 +864,7 @@ html[data-theme="light"] textarea {
     font-weight: 500;
 }
 
+/* Fila de botones de acción al pie del modal */
 .about-actions {
     display: flex;
     gap: 10px;
@@ -809,24 +884,28 @@ html[data-theme="light"] textarea {
     transition: transform .16s ease, opacity .16s ease;
 }
 
+/* Botón fantasma: fondo translúcido con borde */
 .about-ghost {
     background: var(--surface-2);
     color: var(--text-soft);
     border: 1px solid var(--border);
 }
 
+/* Botón principal: gradiente azul sin borde */
 .about-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent-3));
     color: #ffffff;
     border: none;
 }
 
+/* Efecto hover compartido: elevación sutil */
 .about-btn:hover {
     transform: translateY(-1px);
     opacity: .94;
 }
 
-/* Responsive */
+/* ── Diseño responsivo ── */
+/* Tablet: sidebar más angosto */
 @media (max-width: 980px) {
     #sidebar {
         width: 240px !important;
@@ -836,6 +915,7 @@ html[data-theme="light"] textarea {
     }
 }
 
+/* Móvil: sidebar oculto, padding reducido, layouts en columna */
 @media (max-width: 760px) {
     #sidebar {
         display: none !important;
@@ -853,7 +933,9 @@ html[data-theme="light"] textarea {
         flex-direction: column;
     }
 }
-/* ===== SAFE FINAL UI FIXES ===== */
+/* ===== CORRECCIONES FINALES DE UI ===== */
+/* Garantizan que el layout ocupe toda la pantalla verticalmente
+   y que los elementos principales no generen scroll horizontal */
 
 html,
 body,
@@ -871,7 +953,7 @@ body,
 
 #sidebar {
     min-height: 100vh !important;
-    overflow-y: auto !important;
+    overflow-y: auto !important;    /* scroll vertical si el contenido es muy largo */
 }
 
 #main-area {
@@ -885,6 +967,7 @@ body,
     gap: 14px !important;
 }
 
+/* Panel del chat con altura mínima y máxima fija para evitar colapso */
 .chat-panel {
     display: block !important;
     min-height: 520px !important;
@@ -896,7 +979,7 @@ body,
     min-height: 520px !important;
 }
 
-/* Hide Gradio chat action buttons */
+/* ── Ocultar botones de acción nativos de Gradio dentro del chatbot ── */
 #chatbot-main button[title],
 #chatbot-main button[aria-label],
 #chatbot-main [class*="copy"],
@@ -908,7 +991,7 @@ body,
     display: none !important;
 }
 
-/* Remove double border feel */
+/* ── Burbujas del bot: sin doble borde ni sombra extra ── */
 #chatbot-main [data-testid="bot"] [class*="message"],
 #chatbot-main .bot,
 #chatbot-main .message.bot {
@@ -918,7 +1001,7 @@ body,
     background: var(--surface-2) !important;
 }
 
-/* Text readability */
+/* ── Legibilidad del texto dentro del chat ── */
 #chatbot-main p,
 #chatbot-main li,
 #chatbot-main span,
@@ -928,16 +1011,18 @@ body,
     color: var(--text) !important;
 }
 
+/* Negritas más pronunciadas para mejorar la jerarquía visual */
 #chatbot-main strong,
 #chatbot-main b {
     font-weight: 800 !important;
 }
 
+/* Marcadores de lista en color acento para mejor distinción visual */
 #chatbot-main li::marker {
     color: var(--accent-2) !important;
 }
 
-/* Light mode readability */
+/* ── Legibilidad en modo claro ── */
 html[data-theme="light"] #chatbot-main [data-testid="bot"] [class*="message"],
 html[data-theme="light"] #chatbot-main .bot,
 html[data-theme="light"] #chatbot-main .message.bot {
@@ -954,29 +1039,34 @@ html[data-theme="light"] #chatbot-main b {
     color: #111827 !important;
 }
 
+/* Encabezado de sección del sidebar en modo claro: fondo oscuro para contraste */
 html[data-theme="light"] .sb-section-title {
     background: #0f1e35 !important;
     color: #60a5fa !important;
 }
 
+/* Botones del sidebar en modo claro: texto oscuro sobre fondo casi blanco */
 html[data-theme="light"] .qa-sb-btn button,
 html[data-theme="light"] .faq-sb-btn button {
     background: #f8fbff !important;
     color: #111827 !important;
 }
 
+/* Altura mínima del botón Enviar para facilitar el toque en móviles */
 #send-btn {
     min-height: 44px !important;
     max-height: 52px !important;
 }
-/* ===== READABILITY PATCH ===== */
+/* ===== PARCHE DE LEGIBILIDAD ===== */
+/* Asegura que todo el texto dentro del chatbot sea legible en ambos temas.
+   Las sombras de texto pueden reducir el contraste, así que se eliminan. */
 
 #chatbot-main,
 #chatbot-main * {
     text-shadow: none !important;
 }
 
-/* Bot bubble: base readable */
+/* ── Burbuja del bot en tema oscuro: fondo y color base ── */
 #chatbot-main [data-testid="bot"] [class*="message"],
 #chatbot-main .message.bot,
 #chatbot-main .bot {
@@ -984,7 +1074,7 @@ html[data-theme="light"] .faq-sb-btn button {
     color: var(--text) !important;
 }
 
-/* Force markdown text readable */
+/* ── Forzar color legible en todos los elementos de texto dentro del chat ── */
 #chatbot-main p,
 #chatbot-main li,
 #chatbot-main span,
@@ -999,11 +1089,13 @@ html[data-theme="light"] .faq-sb-btn button {
     opacity: 1 !important;
 }
 
+/* Los enlaces dentro del chat se muestran en azul acento con subrayado */
 #chatbot-main a {
     text-decoration: underline !important;
     color: var(--accent-2) !important;
 }
 
+/* Citas en bloque: borde izquierdo azul y fondo ligeramente tintado */
 #chatbot-main blockquote {
     border-left: 4px solid var(--accent-2) !important;
     background: rgba(59, 130, 246, 0.08) !important;
@@ -1012,7 +1104,7 @@ html[data-theme="light"] .faq-sb-btn button {
     border-radius: 8px !important;
 }
 
-/* Light mode: readable bot messages */
+/* ── Correcciones de legibilidad en modo claro para el bot ── */
 html[data-theme="light"] #chatbot-main [data-testid="bot"] [class*="message"],
 html[data-theme="light"] #chatbot-main .message.bot,
 html[data-theme="light"] #chatbot-main .bot {
@@ -1033,84 +1125,140 @@ html[data-theme="light"] #chatbot-main blockquote {
     opacity: 1 !important;
 }
 
+/* Enlace en modo claro: azul más intenso para contraste sobre fondo blanco */
 html[data-theme="light"] #chatbot-main a {
     color: #1d4ed8 !important;
     opacity: 1 !important;
 }
 
+/* Blockquote en modo claro: fondo azul muy suave y borde sólido */
 html[data-theme="light"] #chatbot-main blockquote {
     background: #eaf2ff !important;
     border-left-color: #2563eb !important;
 }
 
-/* Prevent invisible footer notes inside bubbles */
+/* Evita que las notas al pie en cursiva queden invisibles sobre fondo claro */
 html[data-theme="light"] #chatbot-main em,
 html[data-theme="light"] #chatbot-main i {
     color: #374151 !important;
 }
 """
 
-# ── Chat functions ─────────────────────────────────────────────────────────────
+# ── Funciones del chat ─────────────────────────────────────────────────────────
 def _stream_response(msg: str, hist: list):
+    """
+    Genera respuestas de forma progresiva (streaming simulado).
+
+    Flujo:
+    1. Muestra un indicador "Escribiendo..." inmediatamente.
+    2. Espera a que el bot esté listo si todavía está cargando.
+    3. Llama a _bot.respond() para obtener la respuesta real.
+    4. Añade la etiqueta de confianza correspondiente y actualiza el historial.
+
+    Yields:
+        Tuplas (chat_value, state_value, input_value) que Gradio usa para
+        actualizar el chatbot, el estado y limpiar el campo de texto.
+    """
     msg = msg.strip()
+    # Si el mensaje está vacío, no hacer nada y devolver el estado actual
     if not msg:
         yield hist, hist, ""
         return
 
+    # Paso 1: mostrar indicador de escritura antes de consultar al bot
     yield list(hist) + [_um(msg), _am("✍️ *Escribiendo...*")], hist, ""
 
+    # Paso 2: esperar si el motor semántico aún no ha terminado de cargar
     if not _bot_ready.is_set():
         yield list(hist) + [_um(msg), _am(_LOADING_MSG)], hist, ""
-        _bot_ready.wait(timeout=180)
+        _bot_ready.wait(timeout=180)  # Esperar hasta 3 minutos máximo
 
+    # Paso 3: verificar que el bot se inicializó correctamente
     if _bot is None:
         err = list(hist) + [_um(msg), _am("❌ No se pudo iniciar el asistente. Recarga la página.")]
         yield err, err, ""
         return
 
+    # Paso 4: obtener respuesta + nivel de confianza y armar el historial final
     response, confidence = _bot.respond(msg)
-    badge = _CONFIDENCE_BADGES.get(confidence, "")
+    badge = _CONFIDENCE_BADGES.get(confidence, "")  # Etiqueta vacía si la confianza es alta
     new_hist = list(hist) + [_um(msg), _am(response + badge)]
     yield new_hist, new_hist, ""
 
 
 def _quick_reply(question: str, hist: list) -> tuple[list, list]:
+    """
+    Envía una pregunta predefinida (desde el sidebar) y retorna el historial actualizado.
+    Consume el generador de _stream_response hasta la última iteración.
+    """
     result = hist
     for _, s, _ in _stream_response(question, hist):
-        result = s
+        result = s  # Toma solo el estado final del historial
     return result, result
 
 
 def _clear(hist: list) -> tuple[list, list, str]:
+    """
+    Limpia el historial del chat y reinicia la conversación al mensaje de bienvenida.
+    No hace nada si el usuario aún no ha enviado ningún mensaje.
+    """
+    # Si no hay mensajes del usuario, no hay nada que limpiar
     if not any(m.get("role") == "user" for m in (hist or [])):
         return hist, hist, ""
+    # Restaurar el historial inicial con solo el mensaje de bienvenida
     return list(_INIT_HISTORY), list(_INIT_HISTORY), ""
 
 
-# ── Build UI ───────────────────────────────────────────────────────────────────
+# ── Construcción de la interfaz de usuario ─────────────────────────────────────
 def make_demo() -> gr.Blocks:
+    """
+    Construye y devuelve el objeto gr.Blocks con toda la interfaz del chatbot.
+
+    Estructura del layout:
+    ┌─────────────┬───────────────────────────────────────┐
+    │   Sidebar   │            Área principal              │
+    │  (285px)    │  ┌─────────────────────────────────┐  │
+    │  - Marca    │  │         Encabezado               │  │
+    │  - Acciones │  ├─────────────────────────────────┤  │
+    │    rápidas  │  │       Panel del chatbot          │  │
+    │  - FAQs     │  ├─────────────────────────────────┤  │
+    │  - Footer   │  │   Fila de entrada + Enviar       │  │
+    │             │  │   Botón Limpiar conversación     │  │
+    └─────────────┴──┴─────────────────────────────────┴──┘
+    """
     with gr.Blocks(title="ITLA · Asistente Virtual", head=_JS_HEAD) as demo:
-        demo.queue()
+        demo.queue()  # Habilitar cola para manejar múltiples usuarios simultáneos
+
+        # Modal de información (invisible por defecto, se activa con JS)
         gr.HTML(_ABOUT_MODAL)
+
+        # Estado global: mantiene el historial de mensajes entre interacciones
         state = gr.State(list(_INIT_HISTORY))
 
         with gr.Row(elem_id="app-shell", equal_height=False):
+
+            # ── Columna izquierda: sidebar de navegación ──
             with gr.Column(elem_id="sidebar", scale=0):
                 with gr.Group(elem_classes="sidebar-stack"):
-                    gr.HTML(_SIDEBAR_BRAND)
+                    gr.HTML(_SIDEBAR_BRAND)  # Logo + nombre
+
+                    # Sección de acciones rápidas
                     gr.HTML('<div class="sb-section-title">⚡ Acceso Rápido</div>')
                     qa_buttons: list[tuple[str, gr.Button]] = []
                     for label in QUICK_ACTIONS:
                         b = gr.Button(label, elem_classes="qa-sb-btn", size="sm")
-                        qa_buttons.append((label, b))
+                        qa_buttons.append((label, b))  # Guardar referencia para conectar eventos
 
+                    # Sección de preguntas frecuentes
                     gr.HTML('<div class="sb-section-title">💬 Preguntas Frecuentes</div>')
                     faq_buttons: list[tuple[str, gr.Button]] = []
                     for q in FAQS:
                         b = gr.Button(q, elem_classes="faq-sb-btn", size="sm")
-                        faq_buttons.append((q, b))
+                        faq_buttons.append((q, b))  # Guardar referencia para conectar eventos
 
-                    gr.HTML('<div class="sb-spacer"></div>')
+                    gr.HTML('<div class="sb-spacer"></div>')  # Empuja el footer hacia abajo
+
+                    # Footer del sidebar con enlace al sitio oficial
                     gr.HTML(
                         """
                         <div class="sb-footer">
@@ -1120,54 +1268,70 @@ def make_demo() -> gr.Blocks:
                         """
                     )
 
+            # ── Columna derecha: área principal con chat ──
             with gr.Column(elem_id="main-area", scale=1):
-                gr.HTML(_HEADER_HTML)
+                gr.HTML(_HEADER_HTML)  # Encabezado con título y botones
 
+                # Panel del chat con el componente Chatbot de Gradio
                 with gr.Group(elem_classes="chat-panel"):
                     chatbot_ui = gr.Chatbot(
-    value=list(_INIT_HISTORY),
-    height=520,
-    show_label=False,
-    elem_id="chatbot-main",
-)
+                        value=list(_INIT_HISTORY),  # Muestra el mensaje de bienvenida al cargar
+                        height=520,
+                        show_label=False,
+                        elem_id="chatbot-main",
+                    )
 
+                # Fila de entrada: campo de texto + botón Enviar
                 with gr.Row(elem_classes="input-row"):
                     txt_in = gr.Textbox(
                         placeholder="Escribe tu pregunta aquí…",
                         show_label=False,
                         container=False,
-                        scale=5,
+                        scale=5,       # Ocupa 5/6 del espacio disponible
                         lines=1,
-                        max_lines=4,
+                        max_lines=4,   # Expande hasta 4 líneas antes de hacer scroll
                     )
                     send_btn = gr.Button("Enviar ➤", elem_id="send-btn", scale=1, min_width=120)
 
+                # Botón para resetear la conversación
                 clear_btn = gr.Button("🗑️ Limpiar conversación", elem_id="clear-btn", size="sm")
 
+        # ── Función interna que reenvía al generador principal ──
+        # Necesaria porque Gradio requiere que los generadores estén definidos dentro
+        # del bloque gr.Blocks para que los eventos funcionen correctamente
         def _submit(msg, hist):
             for cv, sv, tv in _stream_response(msg, hist):
                 yield cv, sv, tv
 
+        # ── Conectar eventos de la fila de entrada ──
+        # Enter en el textarea y clic en Enviar ejecutan la misma función
         txt_in.submit(_submit, [txt_in, state], [chatbot_ui, state, txt_in])
         send_btn.click(_submit, [txt_in, state], [chatbot_ui, state, txt_in])
+
+        # El botón Limpiar reinicia el historial sin necesidad de recargar la página
         clear_btn.click(_clear, [state], [chatbot_ui, state, txt_in])
 
+        # ── Conectar botones de acciones rápidas del sidebar ──
+        # Cada botón envía la pregunta correspondiente de QUICK_ACTIONS
+        # El argumento _q=q captura el valor en el momento del bucle (cierre de variable)
         for label, btn in qa_buttons:
             q = QUICK_ACTIONS[label]
             btn.click(fn=lambda h, _q=q: _quick_reply(_q, h), inputs=[state], outputs=[chatbot_ui, state])
 
+        # ── Conectar botones de preguntas frecuentes del sidebar ──
         for question, btn in faq_buttons:
             btn.click(fn=lambda h, _q=question: _quick_reply(_q, h), inputs=[state], outputs=[chatbot_ui, state])
 
     return demo
 
 
+# ── Punto de entrada ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app = make_demo()
     app.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False,
-        inbrowser=True,
-        css=CSS,
+        server_name="0.0.0.0",   # Escuchar en todas las interfaces de red
+        server_port=7860,         # Puerto por defecto de Gradio
+        share=False,              # No crear túnel público en Hugging Face
+        inbrowser=True,           # Abrir el navegador automáticamente al iniciar
+        css=CSS,                  # Inyectar los estilos personalizados
     )

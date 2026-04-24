@@ -1,15 +1,53 @@
 """
-ITLA Knowledge Base
+Base de Conocimiento del Chatbot ITLA
+======================================
 
-All chatbot content lives here. Each intent follows a strict schema so the
-matching engine can treat every entry uniformly.
+Este módulo centraliza todo el contenido del chatbot. Cada intent (intención)
+representa un tema que el bot sabe responder y sigue un esquema fijo para que
+el motor de coincidencia los procese de manera uniforme.
+
+Esquema de cada intent:
+    name          - Identificador único del intent (snake_case).
+    category      - Categoría temática: 'general', 'institucional', 'academico',
+                    'contacto' o 'servicios'.
+    keywords      - Palabras clave sueltas que activan el intent.
+    required_words- Palabras que DEBEN estar presentes para confirmar el intent.
+    variants      - Frases completas de ejemplo que representan la intención.
+    response      - Respuesta principal que el bot le muestra al usuario.
+    extended      - Información adicional para cuando el usuario pide más detalle
+                    (None si no aplica).
+    source        - URL de la fuente oficial donde se obtuvo la información.
+
+Para agregar un nuevo tema:
+    1. Copia uno de los bloques existentes.
+    2. Asigna un 'name' único en snake_case (p.ej. "horario_clases").
+    3. Completa 'keywords' con términos sueltos y 'variants' con frases completas
+       que el usuario podría escribir — cuantas más variantes, mejor la cobertura.
+    4. Deja 'required_words' vacío a menos que una palabra sea indispensable
+       para confirmar el tema (p.ej. "beca" en un intent de becas específico).
+    5. Añade el bloque a la lista INTENTS. INTENT_MAP se reconstruye solo.
+
+El mapa INTENT_MAP al final se construye automáticamente.
 """
 
+# ---------------------------------------------------------------------------
+# Lista principal de intents  (total: 13 intents al momento de este commit)
+# Cada elemento es un diccionario con el esquema definido arriba.
+# El orden no importa para la coincidencia, pero conviene agrupar por categoría
+# para facilitar la lectura y el mantenimiento.
+# ---------------------------------------------------------------------------
 INTENTS: list[dict] = [
+
+    # ------------------------------------------------------------------
+    # CATEGORÍA: general
+    # Intents de conversación básica (saludo, despedida).
+    # ------------------------------------------------------------------
     {
         "name": "saludo",
         "category": "general",
+        # Palabras que indican que el usuario está saludando
         "keywords": ["hola", "buenas", "buenos", "saludos", "hey", "klk", "qué tal", "qué hay"],
+        # Lista vacía = no se exige ninguna palabra obligatoria para activar este intent
         "required_words": [],
         "variants": [
             "hola",
@@ -36,9 +74,13 @@ INTENTS: list[dict] = [
             "¿En qué te puedo ayudar?"
         ),
         "extended": None,
-        "source": "N/A",
+        "source": "N/A",  # Intent interno, no tiene fuente web
     },
 
+    # ------------------------------------------------------------------
+    # CATEGORÍA: institucional
+    # Información general sobre el ITLA como institución.
+    # ------------------------------------------------------------------
     {
         "name": "que_es_itla",
         "category": "institucional",
@@ -78,6 +120,10 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do",
     },
 
+    # ------------------------------------------------------------------
+    # CATEGORÍA: contacto
+    # Todo lo relacionado con cómo comunicarse o llegar al ITLA.
+    # ------------------------------------------------------------------
     {
         "name": "ubicacion",
         "category": "contacto",
@@ -164,6 +210,10 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/contacto",
     },
 
+    # ------------------------------------------------------------------
+    # CATEGORÍA: academico
+    # Carreras, inscripción, becas y programas de estudio.
+    # ------------------------------------------------------------------
     {
         "name": "oferta_academica",
         "category": "academico",
@@ -303,6 +353,10 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/educacion-continua",
     },
 
+    # ------------------------------------------------------------------
+    # CATEGORÍA: servicios
+    # Plataforma virtual, soporte técnico y herramientas estudiantiles.
+    # ------------------------------------------------------------------
     {
         "name": "soporte",
         "category": "servicios",
@@ -376,6 +430,13 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/sedes",
     },
 
+    # NOTA: 'plataforma' tiene deliberadamente más variantes que cualquier otro intent.
+    # Los usuarios se refieren al mismo concepto con tres nombres distintos:
+    #   "Moodle", "campus virtual", "plataforma virtual" / "aula virtual"
+    # y combinan esos nombres con preguntas de tipo:
+    #   qué-es / para-qué-sirve / cómo-accedo / cómo-recupero-usuario
+    # Cubrir todas esas combinaciones garantiza que el usuario siempre llegue
+    # al intent correcto independientemente de cómo formule su pregunta.
     {
         "name": "plataforma",
         "category": "servicios",
@@ -489,6 +550,9 @@ INTENTS: list[dict] = [
         "source": "https://www.itla.edu.do/admisiones",
     },
 
+    # ------------------------------------------------------------------
+    # De vuelta a CATEGORÍA: general — cierre de conversación
+    # ------------------------------------------------------------------
     {
         "name": "despedida",
         "category": "general",
@@ -513,8 +577,21 @@ INTENTS: list[dict] = [
             "¡Mucho éxito! 🎓"
         ),
         "extended": None,
-        "source": "N/A",
+        "source": "N/A",  # Intent interno, respuesta generada — sin URL de referencia
     },
 ]
 
+# ---------------------------------------------------------------------------
+# Mapa de acceso rápido por nombre
+# Permite buscar un intent directamente por su campo 'name' en O(1)
+# en lugar de iterar toda la lista INTENTS cada vez.
+#
+# Uso:
+#     INTENT_MAP["saludo"]           → dict completo del intent
+#     "oferta_academica" in INTENT_MAP  → True
+#
+# Este dict se reconstruye automáticamente al importar el módulo,
+# por lo que cualquier intent nuevo añadido a INTENTS estará disponible
+# sin cambios adicionales.
+# ---------------------------------------------------------------------------
 INTENT_MAP: dict[str, dict] = {intent["name"]: intent for intent in INTENTS}
