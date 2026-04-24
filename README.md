@@ -29,6 +29,8 @@ Este chatbot utiliza un enfoque híbrido de procesamiento de lenguaje natural (N
 python app.py
 ````
 
+👉 https://huggingface.co/spaces/Dmeshell99/itla-chatbot
+
 ### 🖥️ Consola
 
 ```bash
