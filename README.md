@@ -29,8 +29,6 @@ Este chatbot utiliza un enfoque híbrido de procesamiento de lenguaje natural (N
 python app.py
 ````
 
-👉 [http://localhost:7860](http://localhost:7860)
-
 ### 🖥️ Consola
 
 ```bash
