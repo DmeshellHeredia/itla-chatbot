@@ -190,7 +190,6 @@ rm -rf .cache
 
 * Mejoras de UI/UX
 * Más intents y cobertura semántica
-* Deploy online (HuggingFace Spaces / Render)
 * Integración con base de datos
 * Logging y analytics
 
