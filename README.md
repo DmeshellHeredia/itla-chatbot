@@ -1,93 +1,201 @@
-# ITLA Chatbot
+# 🎓 ITLA Chatbot
 
-> ⚠️ **IMPORTANTE — ESTADO ACTUAL DEL PROYECTO**
->
-> ✅ La **interfaz web (Gradio)** ya está funcionando correctamente.  
-> 🚧 Actualmente sigo puliendo detalles de **UI/UX y compatibilidad**.  
-> 👉 El chatbot funciona tanto en **modo web** como en **modo consola (CLI)**.
-
-Asistente virtual del Instituto Tecnológico de Las Américas.  
-100% local, gratuito, sin APIs de pago.
+![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![Gradio](https://img.shields.io/badge/UI-Gradio-orange)
+![AI](https://img.shields.io/badge/NLP-Hybrid-green)
+![Status](https://img.shields.io/badge/status-active-success)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
-## Arquitectura
+## 🚀 Descripción
 
-```text
-itla_chatbot/
-├── config.py          # Umbrales y parámetros
-├── knowledge_base.py  # 13 intents con variantes, keywords y respuestas
-├── preprocessor.py    # Normalización de texto (acentos, puntuación, minúsculas)
-├── matcher.py         # Keyword scoring + RapidFuzz fuzzy matching
-├── semantic.py        # sentence-transformers + FAISS (capa semántica)
-├── chatbot.py         # Orquestador del pipeline
-├── app.py             # Interfaz web (Gradio) ✅
-├── cli.py             # Interfaz de línea de comandos ✅
-└── test_chatbot.py    # Suite de pruebas
-````
+Asistente virtual del **Instituto Tecnológico de Las Américas (ITLA)** construido completamente en Python.
 
-## Pipeline de matching
+Este chatbot utiliza un enfoque híbrido de procesamiento de lenguaje natural (NLP) combinando:
 
-```text
-Input → Preprocesamiento → Keyword scoring
-      → Fuzzy matching (RapidFuzz)
-      → Semantic search (opcional)
-      → Puntuación combinada
-      → Umbral de confianza
-      → Respuesta / Fallback
-```
+- Matching por keywords
+- Fuzzy matching (RapidFuzz)
+- Búsqueda semántica (Sentence Transformers + FAISS)
 
-## Instalación
+💡 **100% local, sin APIs externas, sin costos.**
 
-```bash
-pip install -r requirements.txt
-```
+---
 
-Modo ligero (sin capa semántica):
+## ✨ Demo
 
-```bash
-pip install gradio rapidfuzz
-```
-
-## Uso
-
-### 🌐 Web UI (recomendado)
-
+### 🌐 Interfaz Web
 ```bash
 python app.py
-# → http://localhost:7860
-```
+````
 
-### 🖥️ CLI
+👉 [http://localhost:7860](http://localhost:7860)
+
+### 🖥️ Consola
 
 ```bash
 python cli.py
 ```
 
-### 🧪 Tests
+---
+
+## 🧠 Características principales
+
+* 🔎 NLP híbrido (keyword + fuzzy + semantic)
+* ⚡ Respuestas rápidas offline
+* 🎯 Sistema de confianza (high / medium / low / fallback)
+* 💬 UI moderna con Gradio
+* 🧪 Tests automatizados (28/28 ✅)
+* 📚 Base de conocimiento escalable
+* 🌙 Dark / Light mode
+
+---
+
+## 📊 Métricas del proyecto
+
+* ✅ **13 intents**
+* ✅ **180+ variantes de preguntas**
+* ✅ **28 casos de prueba**
+* ✅ **100% tests passing**
+* ✅ Manejo de errores y fallback inteligente
+
+---
+
+## 🏗️ Arquitectura
+
+```text
+itla_chatbot/
+├── config.py
+├── knowledge_base.py
+├── preprocessor.py
+├── matcher.py
+├── semantic.py
+├── chatbot.py
+├── app.py
+├── cli.py
+└── test_chatbot.py
+```
+
+---
+
+## ⚙️ Pipeline NLP
+
+```text
+Input
+ ↓
+Preprocessing
+ ↓
+Keyword Matching
+ ↓
+Fuzzy Matching
+ ↓
+Semantic Search (optional)
+ ↓
+Score fusion
+ ↓
+Confidence evaluation
+ ↓
+Response / Fallback
+```
+
+---
+
+## 📦 Instalación
+
+```bash
+pip install -r requirements.txt
+```
+
+Modo ligero:
+
+```bash
+pip install gradio rapidfuzz
+```
+
+---
+
+## ▶️ Uso
+
+### Web UI (recomendado)
+
+```bash
+python app.py
+```
+
+### CLI
+
+```bash
+python cli.py
+```
+
+### Tests
 
 ```bash
 python test_chatbot.py
 ```
 
-## Umbrales de confianza
+---
 
-| Nivel    | Score | Comportamiento              |
-| -------- | ----: | --------------------------- |
-| high     |  ≥ 65 | Respuesta directa           |
-| medium   |  ≥ 35 | Respuesta extendida + nota  |
-| low      |  ≥ 15 | Mejor intento + advertencia |
-| fallback |  < 15 | Redirección a contacto      |
+## 📈 Sistema de confianza
 
-## Agregar nuevos intents
+| Nivel    | Score | Acción                  |
+| -------- | ----: | ----------------------- |
+| high     |  ≥ 65 | Respuesta directa       |
+| medium   |  ≥ 35 | Respuesta contextual    |
+| low      |  ≥ 15 | Sugerencia aproximada   |
+| fallback |  < 15 | No entendió la pregunta |
 
-Edita `knowledge_base.py` y agrega un nuevo diccionario a `INTENTS`.
+---
 
-El engine lo tomará automáticamente.
-Si usas la capa semántica, borra `.cache/embeddings.pkl` para regenerar los embeddings.
+## ➕ Extensión del sistema
 
-## Fuente de información
+Agregar nuevos intents:
 
-* [ITLA](https://www.itla.edu.do)
+1. Editar `knowledge_base.py`
+2. Añadir nuevo objeto en `INTENTS`
+3. (Opcional) regenerar embeddings:
 
+```bash
+rm -rf .cache
 ```
+
+---
+
+## 📌 Ejemplos de preguntas
+
+* ¿Qué es el ITLA?
+* ¿Cómo me inscribo?
+* ¿Qué carreras ofrecen?
+* ¿Dónde están ubicados?
+* ¿Qué es Moodle?
+* ¿Tienen cursos cortos?
+* ¿Hay becas disponibles?
+
+---
+
+## 🌍 Fuente
+
+* [https://www.itla.edu.do](https://www.itla.edu.do)
+
+---
+
+## 👨‍💻 Autor
+
+**Micha Heredia**
+🔗 [https://github.com/DmeshellHeredia](https://github.com/DmeshellHeredia)
+
+---
+
+## 🧩 Futuras mejoras
+
+* Mejoras de UI/UX
+* Más intents y cobertura semántica
+* Deploy online (HuggingFace Spaces / Render)
+* Integración con base de datos
+* Logging y analytics
+
+---
+
+## 📜 Licencia
+
+MIT License
