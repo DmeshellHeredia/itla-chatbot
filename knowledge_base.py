@@ -143,12 +143,12 @@ INTENTS: list[dict] = [
             "dónde los encuentro",
         ],
         "response": (
-            "📍 **Sede Central ITLA**\n\n"
-            "Autopista Duarte Km. 16½, Los Alcarrizos,\n"
-            "Santo Domingo Oeste, República Dominicana.\n\n"
-            "El ITLA también cuenta con sedes regionales en distintas provincias del país. "
-            "Escribe *sedes* para ver la lista completa."
-        ),
+        "📍 **Sede Central ITLA**\n\n"
+        "Autopista Las Américas, Km. 27, PCSD,\n"
+        "La Caleta, Boca Chica 11606, República Dominicana.\n\n"
+        "El ITLA también cuenta con sedes regionales en distintas provincias del país. "
+        "Escribe *sedes* para ver la lista completa."
+),
         "extended": None,
         "source": "https://www.itla.edu.do/contacto",
     },
@@ -416,7 +416,7 @@ INTENTS: list[dict] = [
         "response": (
             "🗺️ **Sedes ITLA**\n\n"
             "**Sede Central:**\n"
-            "📍 Autopista Duarte Km. 16½, Los Alcarrizos, Santo Domingo Oeste\n\n"
+            "📍 Autopista Las Américas, Km. 27, PCSD, La Caleta, Boca Chica 11606, R.D.\n\n"
             "**Sedes Regionales:**\n"
             "- 🏫 Santiago\n"
             "- 🏫 San Pedro de Macorís\n"
